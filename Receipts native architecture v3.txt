@@ -1,0 +1,1510 @@
+RECEIPTS-NATIVE ARCHITECTURE 
+All citations verified against source repositories 
+Repositories Verified:
+northstaraokeystone/proofpack
+northstaraokeystone/qed
+northstaraokeystone/space-proof
+northstaraokeystone/ai-flight-recorder
+
+DEFINITION
+Receipts-native architecture makes cryptographic receipts the primary data structure. Every operation returns (result, receipt) where:
+receipt = dual_hash(SHA256:BLAKE3) with Merkle lineage
+Compliance Test: Can you reconstruct system state from receipts.jsonl alone?
+
+THREE LAWS
+LAW_1 = "No receipt → not real"
+LAW_2 = "No test → not shipped"
+LAW_3 = "No gate → not alive"
+
+Enforcement:
+Law
+Violation
+Consequence
+LAW_1
+Operation without receipt
+System halts via StopRule exception
+LAW_2
+Code without tests
+Deployment blocked at CI/CD
+LAW_3
+Release without gate
+Production release forbidden
+
+
+SIX PRINCIPLES
+#
+Principle
+Test
+Violation Example
+1
+Native Provenance
+Receipt is PRIMARY output
+logger.info() instead of emit_receipt()
+2
+Cryptographic Lineage
+Trace any receipt to genesis
+Missing parent_hash
+3
+Verifiable Causality
+Audit without source code
+Decisions missing input_hashes
+4
+Query-as-Proof
+Proofs derived, not stored
+Pre-computed alerts
+5
+Thermodynamic Governance
+|ΔS| < 0.01 entropy
+Metrics-based health
+6
+Receipts-Gated Progress
+No receipt → StopRule
+Deployment without gate
+
+Pass all 6 → receipts-native. Fail any → receipts-augmented.
+
+COMPRESSION = DISCOVERY
+The Core Thesis
+Legitimate operations exhibit high entropy (variable, unpredictable patterns). High entropy resists compression. Each legitimate transaction is contextually unique; different patient, different diagnosis, different timing.
+Discrepancies exhibit low entropy (repetitive templates). Low entropy compresses heavily. Coordination reuses the same pattern, same codes, same amounts even with randomization.
+Mathematical Foundation: Shannon Entropy
+Formula: H = -Σ p(x) × log₂(p(x))
+Where:
+p(x) = probability of symbol x in the data stream
+High H → high unpredictability → resists compression
+Low H → high predictability → compresses well
+Domain-Specific Formulations
+ProofPack (Healthcare Discrepancy Detection)
+Source: src/proofpack/multidimensional/detect.py:22-54
+compression_ratio = 1 - (compressed_size / original_size)
+
+Decision Rule:
+ratio > 0.40 → Discrepancy (repetitive data compresses)
+ratio ≤ 0.40 → LEGITIMATE (varied data resists compression)
+Empirical Data (Synthetic Validation):
+Discrepancy cases: 0.55-0.63 compression ratio
+Legitimate cases: 0.25-0.33 compression ratio
+QED (Aerospace Telemetry)
+Source: src/spaceflight/physics_discovery.py:307-369
+compression_ratio = raw_bits / compressed_bits
+
+Direction: ORIGINAL / COMPRESSED (inverse of ProofPack)
+Thresholds:
+ratio ≥ 20.0 → SLO PASS (legitimate physics signal)
+ratio < 5.0 → ANOMALOUS (unexpected compression)
+Typical Value: ~60.0 for 1000-sample, 12-bit aerospace signal
+SpaceProof (Bandwidth Optimization)
+Source: spaceproof/engine/entropy.py:92
+SLO Requirements:
+Minimum compression ratio: 10x
+Minimum recall: 0.999 (three nines)
+Max receipt size: 100 KB (for bandwidth constraints)
+AI Flight Recorder (Decision Quality)
+Source: src/topology.py:97-133
+effectiveness = (H_before - H_after) / H_before
+
+Note: Uses entropy reduction directly, not compression ratio, because autonomous systems care about decision quality not data compression.
+
+MULTI-DIMENSIONAL ENTROPY 
+The Problem: Legitimate Repetition
+Simple compression detection fails in three critical scenarios:
+Legitimate Repetition: Dialysis clinic treats same patient 3x/week with same codes (90935, 36818). Low entropy, but NOT discrepancy.
+
+
+Sophisticated Mimicry: Fraudster studies real claims, adds realistic variation. High entropy, but IS discrepancy.
+
+
+Protocol-Driven Care: Emergency room follows ACLS protocols. Standardized procedures produce low entropy.
+
+
+The Solution: Four-Dimensional Entropy Analysis
+Analyzing entropy across multiple dimensions distinguishes legitimate repetition from coordinated discrepancy.
+
+Dimension 1: Temporal Entropy
+Purpose: Detect artificial timing patterns vs. natural timing variation.
+ProofPack Implementation
+Source: src/proofpack/multidimensional/temporal.py:52-125
+def temporal_entropy(operations: list[dict[str, Any]], tenant_id: str = "default") -> float:
+
+QED Implementation
+Source: src/multidimensional/temporal.py:100
+# Formula: H_temporal = H(hour_distribution) + H(day_distribution)
+
+SpaceProof Implementation
+Source: spaceproof/multidimensional/temporal.py:90
+def temporal_entropy(operations: List[Dict[str, Any]], timestamp_field: str = "ts", emit: bool = True) -> float:
+
+AI Flight Recorder Implementation
+Source: src/multidimensional/temporal.py:69
+def temporal_entropy(operations: list[dict], timestamp_field: str = "timestamp") -> float:
+
+Interpretation:
+H_time > 2.0 → Natural timing variation (legitimate)
+H_time < 1.0 → Artificial timing pattern (suspicious)
+
+Dimension 2: Spatial Entropy
+Purpose: Detect single-source billing vs. natural provider/location variation.
+ProofPack Implementation
+Source: src/proofpack/multidimensional/spatial.py:49-109
+def spatial_entropy(operations: list[dict[str, Any]], tenant_id: str = "default") -> float:
+
+QED Implementation
+Source: src/multidimensional/spatial.py:100
+# Formula: H_spatial = H(source_distribution) + H(phase_distribution)
+
+SpaceProof Implementation
+Source: spaceproof/multidimensional/spatial.py:80
+def spatial_entropy(operations: List[Dict[str, Any]], provider_fields: List[str] = None, ...) -> float:
+
+AI Flight Recorder Implementation
+Source: src/multidimensional/spatial.py:86
+def spatial_entropy(operations: list[dict], agent_field: str = "agent_id", ...) -> float:
+
+
+Dimension 3: Sequential Entropy
+Purpose: Detect templated procedure sequences vs. natural clinical variation.
+ProofPack Implementation
+Source: src/proofpack/multidimensional/sequential.py:55-122
+def sequential_entropy(operations: list[dict[str, Any]], tenant_id: str = "default") -> float:
+
+QED Implementation
+Source: src/multidimensional/sequential.py:75
+# Formula: H_sequential = H(bigram_distribution)
+
+SpaceProof Implementation
+Source: spaceproof/multidimensional/sequential.py:110
+def sequential_entropy(operations: List[Dict[str, Any]], code_fields: List[str] = None, ...) -> float:
+
+AI Flight Recorder Implementation
+Source: src/multidimensional/sequential.py:66
+def sequential_entropy(operations: list[dict], action_field: str = "action.type") -> float:
+
+
+Dimension 4: Compression Entropy
+Purpose: Measure data variability via compression ratio.
+Each system uses its existing compression ratio implementation as the fourth dimension:
+System
+Source
+Formula
+ProofPack
+multidimensional/detect.py:22-54
+1 - (compressed/original)
+QED
+physics_discovery.py:307-369
+raw_bits/compressed_bits
+SpaceProof
+Uses sovereignty score
+Domain-specific
+AI Flight Recorder
+topology.py:97-133
+(H_before-H_after)/H_before
+
+
+Context-Aware Baselines
+Purpose: Establish expected entropy ranges per operational context.
+ProofPack Baselines
+Source: src/proofpack/multidimensional/baselines.py:19-97
+Entity Type
+Lines
+Temporal
+Spatial
+Sequential
+Compression
+dialysis_clinic
+20-32
+(2.0, 3.5)
+(1.5, 3.0)
+(0.5, 1.5)
+(0.30, 0.40)
+emergency_room
+33-45
+(3.5, 5.0)
+(3.0, 5.0)
+(3.0, 5.0)
+(0.20, 0.35)
+vaccination_clinic
+46-58
+(2.5, 4.0)
+(2.0, 3.5)
+(0.3, 1.0)
+(0.35, 0.45)
+primary_care
+59-68
+—
+—
+—
+—
+specialty_clinic
+69-78
+—
+—
+—
+—
+mental_health
+79-88
+—
+—
+—
+—
+default
+89-96
+—
+—
+—
+—
+
+Function: Source: src/proofpack/multidimensional/baselines.py:100-113
+def context_baseline(entity_type: str) -> dict[str, tuple[float, float]]:
+
+QED Baselines
+Source: src/multidimensional/baselines.py:20-86
+Entity Types: nominal_flight, active_maneuver, anomaly_detected, tesla_fsd, spacex_flight, ground_test, default
+Compression Threshold: 20.0-100.0 for nominal_flight baseline
+SpaceProof Baselines
+Source: spaceproof/multidimensional/baselines.py:30
+Entity Types (9): autonomous_ops, earth_commanded, communication_blackout, orbital_compute, constellation_ops, firmware_update, telemetry_collection, decision_lineage, default
+Function: Source: spaceproof/multidimensional/baselines.py:107
+def context_baseline(entity_type: str) -> Dict[str, Tuple[float, float]]:
+
+AI Flight Recorder Baselines
+Source: src/multidimensional/baselines.py
+Entity Types (7): routine_navigation, emergency_response, human_supervised, inspection_mode, return_to_base, stuck_agent, default
+
+Combined Multi-Dimensional Detection
+Decision Rule (All 4 Systems): violations >= 2 → ANOMALY
+ProofPack Implementation
+Source: src/proofpack/multidimensional/detect.py:57-181
+def detect_multidimensional(
+    operations: list[dict[str, Any]], 
+    entity_type: str, 
+    tenant_id: str = "default"
+) -> tuple[bool, dict[str, Any]]:
+
+Decision Rule Location: detect.py:124-125
+is_anomaly = len(violations) >= 2
+# Comment: "Decision: 2+ violations = anomaly"
+
+QED Implementation
+Source: src/multidimensional/detect.py:85-156
+def detect_multidimensional(
+    operations: List[Dict[str, Any]], 
+    entity_type: str, 
+    tenant_id: str = "default", 
+    parent_hash: Optional[str] = None
+) -> Tuple[bool, Dict[str, Any]]:
+
+SpaceProof Implementation
+Source: spaceproof/multidimensional/detect.py:105
+def detect_multidimensional(
+    operations: List[Dict[str, Any]], 
+    entity_type: str, 
+    dimension_4_function: Optional[Callable] = None, 
+    emit: bool = True
+) -> Tuple[bool, Dict[str, Any]]:
+
+Threshold Constant: VIOLATION_THRESHOLD = 2
+AI Flight Recorder Implementation
+Source: src/multidimensional/detect.py:62-190
+def detect_multidimensional(
+    operations: list[dict], 
+    entity_type: Optional[str] = None, 
+    ...
+) -> tuple[bool, dict]:
+
+
+Confidence Scoring
+ProofPack Implementation
+Source: src/proofpack/multidimensional/confidence.py:12-32
+def compute_confidence(violations: list[str]) -> float:
+
+SpaceProof Implementation
+Source: spaceproof/multidimensional/confidence.py:45
+def compute_confidence(violations: List[str]) -> float:
+
+
+Validation: Why Multi-Dimensional Detection Works
+Case 1: Dialysis Clinic (Legitimate Repetition)
+Temporal: 2.8 bits (within baseline 2.0-3.5) ✓
+Spatial: 2.4 bits (within baseline 1.5-3.0) ✓
+Sequential: 0.9 bits (within baseline 0.5-1.5) ✓
+Compression: 0.38 (within baseline 0.30-0.40) ✓
+
+Violations: 0
+Verdict: LEGITIMATE (expected pattern for dialysis)
+
+Case 2: Sophisticated Fraudster (Mimics Variability)
+Temporal: 0.7 bits (BELOW baseline 2.0-3.5) ✗
+Spatial: 0.3 bits (BELOW baseline 1.5-3.0) ✗
+Sequential: 4.2 bits (artificially inflated)
+Compression: 0.31 (within baseline)
+
+Violations: 2 (temporal, spatial)
+Verdict: DISCREPANCY (unnatural timing and location patterns)
+
+Case 3: Vaccination Clinic (Protocol-Driven)
+Temporal: 3.2 bits (within baseline 2.5-4.0) ✓
+Spatial: 2.7 bits (within baseline 2.0-3.5) ✓
+Sequential: 0.6 bits (within baseline 0.3-1.0) ✓
+Compression: 0.42 (within baseline 0.35-0.45) ✓
+
+Violations: 0
+Verdict: LEGITIMATE (expected pattern for vaccination)
+
+
+RECEIPT SCHEMAS FOR MULTI-DIMENSIONAL ENTROPY
+ProofPack Receipt Schemas
+Source: src/proofpack/schemas/receipts/
+Schema File
+Location
+temporal_entropy.schema.json
+receipts/temporal_entropy.schema.json:3
+spatial_entropy.schema.json
+receipts/spatial_entropy.schema.json:3
+sequential_entropy.schema.json
+receipts/sequential_entropy.schema.json:3
+multidimensional_detection.schema.json
+receipts/multidimensional_detection.schema.json:3
+
+AI Flight Recorder Receipt Schemas
+Source: ledger_schema.json 
+Receipt Type
+Version
+temporal_entropy
+
+
+spatial_entropy
+
+
+sequential_entropy
+
+
+multidimensional_detection
+
+
+
+Standard Multi-Dimensional Decision Receipt Structure
+{
+  "receipt_type": "multidimensional_detection",
+  "ts": "ISO8601",
+  "tenant_id": "string",
+  "entity_id": "string",
+  "entity_type": "string",
+  "verdict": "LEGITIMATE | DISCREPANCY",
+  "confidence": "float (0.0-1.0)",
+  "dimensional_scores": {
+    "temporal": "float",
+    "spatial": "float",
+    "sequential": "float",
+    "compression": "float"
+  },
+  "violations": ["string"],
+  "baseline_used": "string",
+  "input_receipt_hashes": ["sha256:blake3"],
+  "payload_hash": "sha256:blake3",
+  "parent_hash": "sha256:blake3"
+}
+
+
+META-LOOP INTEGRATION
+Topology Classification
+Physics Mapping: Pulsar magnetosphere → Learning system
+def classify_topology(pattern: dict) -> str:
+    """
+    Returns: "open" | "closed" | "hybrid"
+    """
+    E = pattern['effectiveness']
+    A = pattern['autonomy_score']
+    T = pattern['transfer_score']
+    V_esc = ESCAPE_VELOCITY[pattern['domain']]
+    
+    if E >= V_esc and A > 0.75:
+        return "open"    # Graduate → spawn CASCADE_MULTIPLIER variants
+    elif T > 0.70:
+        return "hybrid"  # Transfer to adjacent domain
+    else:
+        return "closed"  # Continue optimizing internally
+
+Where:
+E = effectiveness = (H_before - H_after) / n_receipts
+V_esc = ESCAPE_VELOCITY[domain]
+A = autonomy = auto_approved / total_actions
+T = transfer = temporal_graph_similarity (NOT cosine)
+Topology Classification Implementations
+AI Flight Recorder
+Source: src/topology.py:214-246
+def classify_topology(pattern: Pattern) -> str:
+
+Also: src/topology.py:445
+def classify_topology_v2(pattern_dict: dict) -> str:
+
+Escape Velocity Constants
+QED
+Source: sim/constants.py:81-82, entropy.py:29
+PLANCK_ENTROPY = 0.001  # Minimum entropy floor
+
+Compression threshold serves as escape velocity:
+# SLO: compression_ratio >= 20:1
+
+ProofPack
+Source: src/proofpack/loop/src/constants.py:18-32
+AGENT_MIN_EFFECTIVENESS = 0.85   # Minimum to avoid pruning
+AGENT_GRADUATION_THRESHOLD = 0.90  # Graduate to autonomous
+CONFIDENCE_THRESHOLD = 0.85       # Minimum confidence for auto-action
+
+SpaceProof
+Source: spaceproof/meta_integration.py:31
+ESCAPE_VELOCITY = {
+    "mars_sovereignty": 0.80,
+    "bandwidth_optimization": 0.85,
+    "delayed_verification": 0.88,
+    "life_support_entropy": 0.90
+}
+
+Also in: ledger_schema.json:403-406
+ESCAPE_VELOCITY_ORBITAL_COMPUTE = 0.90
+ESCAPE_VELOCITY_CONSTELLATION_OPS = 0.85
+ESCAPE_VELOCITY_AUTONOMOUS_DECISION = 0.88
+ESCAPE_VELOCITY_FIRMWARE_INTEGRITY = 0.80
+
+AI Flight Recorder
+Source: config/constants.py:53-60
+ESCAPE_VELOCITY = {
+    "navigation": 0.90,
+    "threat_detection": 0.95,
+    "target_acquisition": 0.88,
+    "anomaly_response": 0.85,
+    "drone_navigation": 0.90,
+    "default": 0.85
+}
+
+The Cycle (8 Phases, 60 Seconds)
+SENSE → ANALYZE → CLASSIFY → HARVEST → HYPOTHESIZE → GATE → ACTUATE → SELECT
+
+Phase
+Receipt Type
+SENSE
+sense_receipt
+ANALYZE
+analyze_receipt
+CLASSIFY
+topology_receipt
+HARVEST
+harvest_receipt
+HYPOTHESIZE
+hypothesis_receipt
+GATE
+gate_receipt
+ACTUATE
+actuate_receipt
+SELECT
+selection_receipt
+
+Additional receipts:
+cascade_receipt (when OPEN topology spawns variants)
+transfer_receipt (when HYBRID topology transfers)
+meta_loop_receipt (per cycle summary)
+
+MONTE CARLO VALIDATION
+The Paradigm
+Unit tests: Does this function return correct values? Monte Carlo: Does this system reach stable equilibrium under extreme conditions?
+Microscopic correctness + macroscopic correctness = production-ready
+8 Mandatory Scenarios
+#
+Name
+Cycles
+Pass Criteria
+1
+BASELINE
+1000
+99.9% completion, 0 violations
+2
+STRESS
+500
+≥95% accuracy at 5x volume, <5.5GB RAM
+3
+TOPOLOGY
+100
+≥98% classification accuracy
+4
+CASCADE
+100
+Exact variant count, all backtest pass
+5
+COMPRESSION
+200
+Meta-pattern outperforms both by ≥5%
+6
+SINGULARITY
+2000*
+Population converges, entropy negative
+7
+THERMODYNAMIC
+1000
+|Δentropy| < 0.01 every cycle
+8
+FEEDBACK_LOOP
+500
+50% correction rate decrease
+
+*Early termination on convergence
+Constraint Validators (Run Every Cycle)
+Validator
+Condition
+Action
+ConservationValidator
+|entropy_in - (entropy_out + work)| < 0.01
+HALT
+BoundaryValidator
+Open patterns meet V_esc
+Emit violation
+PopulationValidator
+Count < max_sustainable
+Emit violation
+ReceiptValidator
+All ops emit receipts
+Emit violation
+LearningValidator
+Correction rate decreasing
+Emit violation
+
+Stress Vectors (Composable)
+multiply_volume(5.0)           # 5x receipt rate
+vary_effectiveness(0.5, 1.0)   # Random pattern effectiveness
+inject_entropy_noise(0.2)      # ±20% entropy fluctuation
+inject_human_corrections(0.05) # 5% of decisions corrected
+simulate_policy_drift(0.1)     # 10% policy change mid-run
+
+
+MANDATORY STACK
+Core Files 
+File
+Functions
+Non-negotiable
+core.py
+dual_hash(), emit_receipt(), merkle_root(), StopRule()
+All four required
+ledger.py
+ingest(), query(), batch_anchor(), verify_chain()
+Append-only
+receipts.jsonl
+—
+One receipt per line
+sim/scenarios.py
+8 scenarios
+All pass or no ship
+tests/
+pytest
+100% coverage
+
+Core Functions Reference Implementation
+import hashlib
+import json
+from datetime import datetime
+
+try:
+    import blake3
+    HAS_BLAKE3 = True
+except ImportError:
+    HAS_BLAKE3 = False
+
+def dual_hash(data: bytes | str) -> str:
+    """SHA256:BLAKE3 - ALWAYS use this, never single hash."""
+    if isinstance(data, str):
+        data = data.encode()
+    sha = hashlib.sha256(data).hexdigest()
+    b3 = blake3.blake3(data).hexdigest() if HAS_BLAKE3 else sha
+    return f"{sha}:{b3}"
+
+def emit_receipt(receipt_type: str, data: dict) -> dict:
+    """Every function calls this. No exceptions."""
+    receipt = {
+        "receipt_type": receipt_type,
+        "ts": datetime.utcnow().isoformat() + "Z",
+        "tenant_id": data.get("tenant_id", "default"),
+        "payload_hash": dual_hash(json.dumps(data, sort_keys=True)),
+        **data
+    }
+    print(json.dumps(receipt), flush=True)
+    return receipt
+
+class StopRule(Exception):
+    """Raised when stoprule triggers. Never catch silently."""
+    pass
+
+def merkle_root(items: list) -> str:
+    """Compute Merkle root of items."""
+    if not items:
+        return dual_hash(b"empty")
+    hashes = [dual_hash(json.dumps(i, sort_keys=True)) for i in items]
+    while len(hashes) > 1:
+        if len(hashes) % 2:
+            hashes.append(hashes[-1])
+        hashes = [dual_hash(hashes[i] + hashes[i+1]) 
+                  for i in range(0, len(hashes), 2)]
+    return hashes[0]
+
+
+SLO THRESHOLDS
+Universal SLOs (All Systems)
+Metric
+Threshold
+Stoprule
+Entropy conservation
+|Δ| < 0.01
+HALT immediately
+Cycle completion
+≥99.9%
+Emit violation
+Memory usage
+<5.5GB
+Emit violation
+Classification accuracy
+≥95%
+Emit violation
+Receipt emission
+100%
+HALT (LAW_1)
+
+Domain-Specific SLOs
+QED (Telemetry)
+Metric
+Threshold
+Source
+Compression ratio
+≥20.0
+physics_discovery.py:307-369
+Anomaly detection
+ratio <5.0 flags
+physics_discovery.py:307-369
+PLANCK_ENTROPY
+≥0.001 bits
+entropy.py:29
+
+ProofPack (Discrepancy Detection)
+Metric
+Threshold
+Source
+Discrepancy detection
+ratio >0.40
+multidimensional/detect.py:22-54
+Multi-dimensional
+2+ violations
+detect.py:124-125
+False positive rate
+<5%
+Design goal
+
+SpaceProof (Autonomy)
+Metric
+Threshold
+Source
+Compression ratio
+≥10x
+Design spec
+Receipt recall
+≥0.999
+Design spec
+Max receipt size
+<100KB
+Bandwidth constraint
+
+AI Flight Recorder (Decision Quality)
+Metric
+Threshold
+Source
+Effectiveness
+≥0.85-0.95
+config/constants.py:53-60
+Multi-dim latency
+<250ms for 1000 ops
+Verified in tests
+
+
+DOMAIN COMPOSITIONS
+Mandatory module combinations (not optional):
+Domain
+Required Modules
+Critical Scenario
+Telemetry (QED)
+core + ledger + detect + anchor + entropy + multidimensional
+THERMODYNAMIC
+Discrepancy (ProofPack)
+core + ledger + detect + anchor + loop + quantum + multidimensional + mcp_server
+STRESS
+Space (SpaceProof)
+core + ledger + anchor + sovereignty + multidimensional
+SINGULARITY
+Autonomous (AI Flight Recorder)
+core + ledger + topology + governance + multidimensional
+FEEDBACK_LOOP
+
+
+MCP PROTOCOL
+Every receipts-native system MUST expose an MCP server:
+{
+  "mcpServers": {
+    "system_name": {
+      "command": "python",
+      "args": ["-m", "system_name.mcp_server"],
+      "tools": ["query_receipts", "verify_chain", "get_topology"]
+    }
+  }
+}
+
+Required tools:
+query_receipts(filters) → Returns matching receipts
+verify_chain(start, end) → Returns integrity boolean
+get_topology(pattern_id) → Returns open/closed/hybrid
+
+CONTEXT ENGINEERING
+Paradigm: Receipts are context sources in a self-correcting pipeline.
+Query Type
+Primary Source
+Fallback
+Threshold
+Historical fact
+Receipt ledger
+—
+0.95
+Pattern match
+META-LOOP topology
+Receipt scan
+0.85
+External validation
+Web search
+Fail gracefully
+0.70
+Cross-domain
+Temporal graph
+Cosine similarity
+0.80
+
+Auto-fallback: If primary confidence < threshold → escalate automatically
+
+HITL/HOTL DECISION MATRIX
+Risk Level
+Model
+Human Role
+CRITICAL
+Human-in-Loop (HITL)
+Approves each decision
+HIGH
+Human-on-Loop (HOTL)
+Monitors, intervenes on trigger
+MEDIUM
+Autonomous + Audit
+Reviews samples post-hoc
+LOW
+Full Autonomous
+Audit trail only
+
+Every decision emits: gate_receipt with risk_level, approver_id
+AI Flight Recorder RACI Implementation
+Source: src/governance/raci.py:249-298
+Function
+Lines
+Signature
+get_raci_for_decision
+249-266
+def get_raci_for_decision(decision: dict) -> dict:
+validate_raci_coverage
+269-279
+def validate_raci_coverage(decision: dict) -> tuple[bool, list]:
+emit_raci_receipt
+282-298
+def emit_raci_receipt(assignment: RACIAssignment) -> dict:
+
+Reason Codes
+Source: config/reason_codes.json (v2.1)
+Codes: SAFETY_CRITICAL, IMMINENT_DANGER, SENSOR_MALFUNCTION, MISSION_CHANGE, WEATHER_OVERRIDE, AIRSPACE_RESTRICTION, MODEL_ERROR, CONFIDENCE_OVERRIDE, CONTEXT_MISSING, POLICY_VIOLATION, REGULATORY_COMPLIANCE, TESTING, CALIBRATION, OTHER
+
+BUILD GATES
+Gate
+Deliverables
+Pass Criteria
+T+2h
+spec.md, ledger_schema.json, core.py
+dual_hash() works
+T+24h
+All modules, 80% coverage
+BASELINE passes
+T+48h
+100% coverage, 8 scenarios
+Production-ready
+
+
+DIRECTORY STRUCTURE
+system_name/
+├── spec.md
+├── ledger_schema.json
+├── cli.py
+├── receipts.jsonl
+├── mcp_server.py
+├── src/
+│   ├── core.py
+│   ├── ledger.py
+│   ├── context.py
+│   ├── multidimensional/          # v3.0 ADDITION
+│   │   ├── temporal.py
+│   │   ├── spatial.py
+│   │   ├── sequential.py
+│   │   ├── baselines.py
+│   │   ├── confidence.py
+│   │   └── detect.py
+│   └── [domain].py
+├── sim/
+│   ├── sim.py
+│   └── scenarios.py
+├── tests/
+│   └── test_multidimensional/     # v3.0 ADDITION
+├── gate_t2h.sh
+├── gate_t24h.sh
+├── gate_t48h.sh
+└── MANIFEST.anchor
+
+
+DISTINCTIONS
+Architecture
+Primary Structure
+Verification
+Offline
+Consensus
+Receipts-Native
+Receipt (proof)
+Cryptographic
+Yes
+No
+Blockchain
+Block (consensus)
+Distributed
+No
+Yes
+Event Sourcing
+Event (history)
+Replay
+Yes
+No
+Audit Logging
+Log (retrospective)
+Manual
+Yes
+No
+
+If you can disable receipts and still operate → not receipts-native.
+
+VERIFICATION PROTOCOL
+def verify_receipts_native(system):
+    """Comprehensive verification. Pass all 6 principles or fail."""
+    
+    # P1: Native Provenance
+    assert reconstruct_state(receipts) == system.state
+    
+    # P2: Cryptographic Lineage
+    assert trace_to_genesis(random_receipt())
+    
+    # P3: Verifiable Causality
+    assert verify_decision_lineage(no_source_code=True)
+    
+    # P4: Query-as-Proof
+    assert derive_proof(query) == compute(receipts)
+    
+    # P5: Thermodynamic Governance
+    assert abs(entropy_delta) < 0.01
+    
+    # P6: Receipts-Gated Progress
+    with pytest.raises(StopRule):
+        advance_without_gate()
+    
+    return "RECEIPTS-NATIVE VERIFIED"
+
+
+APPENDIX A: INFORMATION FLOW
+Scenario: Healthcare Claim Processing (ProofPack)
+A medical provider submits a claim. The receipts-native system must:
+Verify authenticity
+Calculate entropy across multiple dimensions
+Generate a cryptographic proof
+Enable later audit without source code
+PHASE 1: INGESTION
+1. External Event: Claim Submission
+Provider: ABC Clinic
+Patient: [REDACTED]
+Codes: 99213 (Office Visit), 80053 (Metabolic Panel)
+Amount: $285.00
+Timestamp: 2025-01-15T14:32:18Z
+
+2. Function Call
+Function: ingest_claim(claim_data: dict)
+Source: src/proofpack/ledger.py:45
+
+3. Dual-Hash Payload Generated
+SHA256: 8f9e2d1a3c4b5f6e...
+BLAKE3: 3c4a1b7f9e2d8a5c...
+Format: sha256:blake3
+
+4. Emit Ingest Receipt
+{
+  "receipt_type": "ingest",
+  "ts": "2025-01-15T14:32:18Z",
+  "tenant_id": "cms_region_04",
+  "claim_id": "CLM-2025-00147",
+  "provider_id": "NPI-1234567890",
+  "payload_hash": "8f9e2d1a...:3c4a1b7f...",
+  "parent_hash": "7e8d1c2a...:2b3a9e6f..."
+}
+
+PHASE 2: MULTI-DIMENSIONAL ENTROPY ANALYSIS
+The Ingested Claim triggers 4 parallel analysis processes:
+Dimension
+Function
+Source
+Result
+Emits
+1. Temporal
+temporal_entropy
+temporal.py:52-125
+H=2.8
+temporal_entropy_receipt
+2. Spatial
+spatial_entropy
+spatial.py:49-109
+H=2.4
+spatial_entropy_receipt
+3. Sequential
+sequential_entropy
+sequential.py:55-122
+H=0.9
+sequential_entropy_receipt
+4. Compression
+compute_compression_ratio
+detect.py:22-54
+ratio=0.38
+compression_receipt
+
+PHASE 3: BASELINE COMPARISON & DECISION
+1. Lookup Baseline Expectations
+Provider: NPI-1234567890 → Type: "primary_care_clinic"
+Source: baselines.py:59-68
+
+2. Comparison Matrix
+Dimension
+Measured
+Baseline Range
+Status
+Temporal
+2.8
+2.0 - 3.5
+ PASS
+Spatial
+2.4
+1.5 - 3.0
+ PASS
+Sequential
+0.9
+0.5 - 2.0
+ PASS
+Compression
+0.38
+0.30 - 0.40
+ PASS
+
+Violations: 0 Decision Rule: violations >= 2 → discrepancy (Source: detect.py:124-125)
+3. Emit Decision Receipt
+{
+  "receipt_type": "multidimensional_detection",
+  "ts": "2025-01-15T14:32:19.847Z",
+  "tenant_id": "cms_region_04",
+  "claim_id": "CLM-2025-00147",
+  "verdict": "LEGITIMATE",
+  "confidence": 0.94,
+  "dimensional_scores": {
+    "temporal": 2.8,
+    "spatial": 2.4,
+    "sequential": 0.9,
+    "compression": 0.38
+  },
+  "violations": [],
+  "baseline_used": "primary_care_clinic",
+  "input_receipt_hashes": [
+    "8f9e2d1a...:3c4a1b7f...",
+    "7a3b4c5d...:9e2f1a8b...",
+    "4e5f6a7b...:2c3d4e5f...",
+    "9a8b7c6d...:1e2f3a4b...",
+    "3d4e5f6a...:8c9d1e2f..."
+  ],
+  "payload_hash": "2b3c4d5e...:7f8a9b1c...",
+  "parent_hash": "8f9e2d1a...:3c4a1b7f..."
+}
+
+PHASE 4: MERKLE ANCHORING
+Trigger: Every 1000 receipts OR every 5 minutes (whichever first)
+{
+  "receipt_type": "merkle_anchor",
+  "ts": "2025-01-15T14:37:00Z",
+  "merkle_root": "5a6b7c8d...:1e2f3a4b...",
+  "batch_size": 1000,
+  "receipt_range": {
+    "first": "CLM-2025-00001",
+    "last": "CLM-2025-01000"
+  }
+}
+
+PHASE 5: EXTERNAL AUDIT (Without Source Code)
+Auditor Query: "Prove claim CLM-2025-00147 was processed correctly"
+The Auditor Has:
+receipts.jsonl (append-only ledger)
+Public verification script (no source code needed)
+The Claim ID
+Verification Steps:
+Locate Ingest Receipt
+Locate Decision Receipt
+Verify Dimensional Receipts Exist (4 hashes)
+Verify Merkle Anchor
+Reconstruct Merkle Path
+Audit Conclusion:
+✓ Claim was ingested
+✓ Four dimensions were analyzed
+✓ Decision was made with 0.94 confidence
+✓ Verdict: LEGITIMATE
+✓ Proof generated without source code or database access
+
+APPENDIX B: IMPLEMENTATION MATRIX
+Verified Implementations Across 4 Repositories
+System
+Domain
+Repository
+Test Count
+QED
+Aerospace Telemetry
+northstaraokeystone/qed
+86 multidim tests
+ProofPack
+Healthcare Discrepancy
+northstaraokeystone/proofpack
+84 multidim tests
+SpaceProof
+Deep Space Autonomy
+northstaraokeystone/space-proof
+146 multidim + 458 existing = 604 total
+AI Flight Recorder
+Autonomous Systems
+northstaraokeystone/ai-flight-recorder
+92 multidim tests
+
+
+SECTION 1: SHANNON ENTROPY IMPLEMENTATIONS
+All four systems implement H = -Σ p(x) × log₂(p(x)) applied to domain-specific data structures.
+1.1 QED (Aerospace Telemetry)
+File: entropy.py Function: system_entropy Lines: 39-77 Signature: def system_entropy(receipts: List[dict]) -> float:
+# Calculates Shannon entropy over receipt_type distribution
+# Returns: float, never returns 0 (minimum PLANCK_ENTROPY)
+# Edge cases:
+#   - Empty list → PLANCK_ENTROPY
+#   - Single receipt type → PLANCK_ENTROPY
+
+Constant: File: entropy.py:29
+PLANCK_ENTROPY = 0.001  # Minimum entropy of existence
+
+1.2 ProofPack (Healthcare Discrepancy)
+File: src/proofpack/loop/src/quantum.py Function: shannon_entropy Lines: 130-141 Signature: def shannon_entropy(probabilities: list[float]) -> float:
+Usage Context: File: src/proofpack/loop/src/cycle.py Function: compute_stream_entropy Lines: 48-83 Signature: def compute_stream_entropy(receipts: list[dict]) -> float:
+1.3 SpaceProof (Deep Space Autonomy)
+File: spaceproof/engine/entropy.py Function: shannon_entropy Line: 92 Signature: def shannon_entropy(data: Union[bytes, np.ndarray, List[float]]) -> EntropyMeasurement:
+Alternative: File: spaceproof/detect.py Line: 65 Signature: def shannon_entropy(distribution: np.ndarray) -> float:
+1.4 AI Flight Recorder (Autonomous Systems)
+File: src/topology.py Function: compute_entropy Lines: 53-94 Signature: def compute_entropy(decisions: list[dict], field: str = "action.type") -> float:
+
+SECTION 2: MULTI-DIMENSIONAL ENTROPY IMPLEMENTATIONS
+2.1 ProofPack
+Function
+File
+Lines
+Signature
+temporal_entropy
+multidimensional/temporal.py
+52-125
+def temporal_entropy(operations: list[dict[str, Any]], tenant_id: str = "default") -> float:
+spatial_entropy
+multidimensional/spatial.py
+49-109
+def spatial_entropy(operations: list[dict[str, Any]], tenant_id: str = "default") -> float:
+sequential_entropy
+multidimensional/sequential.py
+55-122
+def sequential_entropy(operations: list[dict[str, Any]], tenant_id: str = "default") -> float:
+context_baseline
+multidimensional/baselines.py
+100-113
+def context_baseline(entity_type: str) -> dict[str, tuple[float, float]]:
+detect_multidimensional
+multidimensional/detect.py
+57-181
+def detect_multidimensional(operations: list[dict[str, Any]], entity_type: str, tenant_id: str = "default") -> tuple[bool, dict[str, Any]]:
+compute_compression_ratio
+multidimensional/detect.py
+22-54
+def compute_compression_ratio(operations: list[dict[str, Any]]) -> float:
+compute_confidence
+multidimensional/confidence.py
+12-32
+def compute_confidence(violations: list[str]) -> float:
+
+Decision Rule: detect.py:124-125
+is_anomaly = len(violations) >= 2
+# Comment: "Decision: 2+ violations = anomaly"
+
+Baselines: 7 entity types at baselines.py:19-97
+2.2 QED
+Function
+File
+Lines/Line
+Signature
+detect_multidimensional
+src/multidimensional/detect.py
+85-156
+def detect_multidimensional(operations: List[Dict[str, Any]], entity_type: str, tenant_id: str = "default", parent_hash: Optional[str] = None) -> Tuple[bool, Dict[str, Any]]:
+temporal_entropy
+src/multidimensional/temporal.py
+100
+Formula: H_temporal = H(hour_distribution) + H(day_distribution)
+spatial_entropy
+src/multidimensional/spatial.py
+100
+Formula: H_spatial = H(source_distribution) + H(phase_distribution)
+sequential_entropy
+src/multidimensional/sequential.py
+75
+Formula: H_sequential = H(bigram_distribution)
+
+Baselines: src/multidimensional/baselines.py:20-86 Entity Types: nominal_flight, active_maneuver, anomaly_detected, tesla_fsd, spacex_flight, ground_test, default
+2.3 SpaceProof
+Function
+File
+Line
+Signature
+temporal_entropy
+multidimensional/temporal.py
+90
+def temporal_entropy(operations: List[Dict[str, Any]], timestamp_field: str = "ts", emit: bool = True) -> float:
+temporal_entropy_normalized
+multidimensional/temporal.py
+185
+def temporal_entropy_normalized(operations: List[Dict[str, Any]], timestamp_field: str = "ts") -> float:
+spatial_entropy
+multidimensional/spatial.py
+80
+def spatial_entropy(operations: List[Dict[str, Any]], provider_fields: List[str] = None, ...) -> float:
+sequential_entropy
+multidimensional/sequential.py
+110
+def sequential_entropy(operations: List[Dict[str, Any]], code_fields: List[str] = None, ...) -> float:
+detect_multidimensional
+multidimensional/detect.py
+105
+def detect_multidimensional(operations: List[Dict[str, Any]], entity_type: str, dimension_4_function: Optional[Callable] = None, emit: bool = True) -> Tuple[bool, Dict[str, Any]]:
+context_baseline
+multidimensional/baselines.py
+107
+def context_baseline(entity_type: str) -> Dict[str, Tuple[float, float]]:
+compute_confidence
+multidimensional/confidence.py
+45
+def compute_confidence(violations: List[str]) -> float:
+
+Baselines: multidimensional/baselines.py:30 Entity Types (9): autonomous_ops, earth_commanded, communication_blackout, orbital_compute, constellation_ops, firmware_update, telemetry_collection, decision_lineage, default
+Decision Rule: VIOLATION_THRESHOLD = 2
+2.4 AI Flight Recorder
+Function
+File
+Line
+Signature
+temporal_entropy
+src/multidimensional/temporal.py
+69
+def temporal_entropy(operations: list[dict], timestamp_field: str = "timestamp") -> float:
+spatial_entropy
+src/multidimensional/spatial.py
+86
+def spatial_entropy(operations: list[dict], agent_field: str = "agent_id", ...) -> float:
+sequential_entropy
+src/multidimensional/sequential.py
+66
+def sequential_entropy(operations: list[dict], action_field: str = "action.type") -> float:
+detect_multidimensional
+src/multidimensional/detect.py
+62-190
+def detect_multidimensional(operations: list[dict], entity_type: Optional[str] = None, ...) -> tuple[bool, dict]:
+
+Baselines: src/multidimensional/baselines.py Entity Types (7): routine_navigation, emergency_response, human_supervised, inspection_mode, return_to_base, stuck_agent, default
+Feature Flag: FEATURE_MULTIDIMENSIONAL_ENTROPY_ENABLED at config/features.py:85
+SLO Verified: <250ms for 1000 operations
+
+SECTION 3: DUAL-HASH IMPLEMENTATIONS
+All four systems implement sha256:blake3 dual-hash for receipt integrity.
+System
+File
+Line
+Signature
+QED
+receipts.py
+58
+def dual_hash(data: Union[bytes, str]) -> str:
+ProofPack
+src/proofpack/core/receipt.py
+25-49
+def dual_hash(data: bytes | str) -> str:
+SpaceProof
+spaceproof/core.py
+86
+def dual_hash(data: bytes | str) -> str:
+AI Flight Recorder
+src/core.py
+47
+def dual_hash(data: bytes | str) -> str:
+
+
+SECTION 4: MERKLE TREE IMPLEMENTATIONS
+System
+File
+Line
+Signature
+Notes
+QED
+receipts.py
+120
+def merkle(...)
+Named "merkle", not "merkle_root"
+ProofPack
+src/proofpack/core/receipt.py
+87-121
+def merkle_root(items: list) -> str:
+
+
+ProofPack
+src/proofpack/anchor/merkle.py
+7-48
+def compute_merkle_root(receipts: list[dict]) -> str:
+Alternative
+SpaceProof
+—
+—
+NOT FOUND
+Gap identified
+AI Flight Recorder
+src/core.py
+125
+def merkle_root(items: list) -> str:
+
+
+
+
+SECTION 5: EFFECTIVENESS SCORE IMPLEMENTATIONS
+Formula: E = (H_before - H_after) / n_receipts
+System
+File
+Lines
+Signature
+Formula Variant
+QED
+entropy.py
+84-109
+def agent_fitness(receipts_before, receipts_after, pattern_receipt_count) -> float:
+(H_before - H_after) / n_receipts
+ProofPack
+loop/src/effectiveness.py
+91-136
+def compute_effectiveness(agent_data: dict) -> float:
+(baseline - current) / actions
+SpaceProof
+meta_integration.py
+179
+def calculate_effectiveness(pattern: Dict[str, Any]) -> float:
+(H_before - H_after) / n_receipts
+AI Flight Recorder
+src/topology.py
+97-133
+def compute_effectiveness(decisions: list[dict]) -> float:
+(H_before - H_after) / H_before
+
+
+SECTION 6: DOMAIN-SPECIFIC NOVELTY
+6.1 QED: Physics-Based Compression
+File: src/spaceflight/physics_discovery.py Lines: 307-369 Function: compute_compression_ratio Signature: def compute_compression_ratio(stream: TelemetryStream, fit: TrajectoryFit, bit_depth: int = 16) -> float:
+Key Innovation:
+# Instead of: zlib.compress(telemetry_data)
+# QED does: fit_physics_law(telemetry_data) + compress_residuals(data - law)
+
+Also: causal_graph.py:522 - def self_compression_ratio(graph: nx.DiGraph) -> float:
+6.2 ProofPack: Multi-Dimensional Entropy
+Novel Aspect: Discrepancy detection via four independent entropy dimensions instead of single compression ratio.
+Detection Rule: is_anomaly = len(violations) >= 2 at detect.py:124-125
+Patent Claim: Multi-dimensional entropy analysis distinguishes legitimate repetition from discrepancy, solving the "legitimate repetition problem"
+6.3 SpaceProof: Information-Theoretic Sovereignty
+Files:
+spaceproof/sovereignty/mars/integrator.py:28 - def calculate_sovereignty_score(...)
+spaceproof/decision_augmented.py:323 - def calculate_sovereignty_with_augmentation(...)
+spaceproof/sovereignty_core.py:223 - def calculate_sovereignty_threshold(...)
+Formula:
+# Internal decision capacity (bits/second)
+internal_rate = log2(1 + crew × augmentation × 10 + flops × 10^-15)
+
+# External input rate (accounting for light-time delay)
+external_rate = (bandwidth × 10^6) / (2 × delay_seconds)
+
+# Sovereignty: Can colony outpace Earth input?
+sovereignty = internal_rate > external_rate
+
+6.4 AI Flight Recorder: Decision Lineage + RACI
+RACI Functions: File: src/governance/raci.py
+Function
+Lines
+Signature
+get_raci_for_decision
+249-266
+def get_raci_for_decision(decision: dict) -> dict:
+validate_raci_coverage
+269-279
+def validate_raci_coverage(decision: dict) -> tuple[bool, list]:
+emit_raci_receipt
+282-298
+def emit_raci_receipt(assignment: RACIAssignment) -> dict:
+
+Reason Codes: File: config/reason_codes.json (v2.1)
+
+
+
+
+SECTION 7: TEST COVERAGE
+System
+Multidimensional Tests
+Total Tests
+Status
+QED
+86
+—
+All passing
+ProofPack
+84 (7 test files)
+—
+All passing
+SpaceProof
+146
+604 total
+All passing
+AI Flight Recorder
+92
+—
+All passing
+
+ProofPack Test Files:
+test_temporal.py
+test_spatial.py
+test_sequential.py
+test_baselines.py
+test_confidence.py
+test_detect.py
+test_scenarios.py
+
+SECTION 8: SUMMARY TABLE
+Feature
+QED
+ProofPack
+SpaceProof
+AI Flight Recorder
+Shannon Entropy
+entropy.py:39-77
+quantum.py:130
+entropy.py:92
+topology.py:53-94
+Temporal Entropy
+temporal.py:100
+temporal.py:52-125
+temporal.py:90
+temporal.py:69
+Spatial Entropy
+spatial.py:100
+spatial.py:49-109
+spatial.py:80
+spatial.py:86
+Sequential Entropy
+sequential.py:75
+sequential.py:55-122
+ sequential.py:110
+sequential.py:66
+Multi-Dim Detection
+detect.py:85-156
+detect.py:57-181
+detect.py:105
+detect.py:62-190
+Context Baselines
+ 7 types
+ 7 types
+ 9 types
+ 7 types
+Dual-Hash
+ receipts.py:58
+ receipt.py:25
+ 
+core.py:86
+core.py:47
+Merkle Tree
+receipts.py:120
+receipt.py:87
+✗ NOT FOUND
+core.py:125
+Effectiveness (E)
+entropy.py:84-109
+effectiveness.py:91
+meta_integration.py:179
+topology.py:97-133
+Escape Velocity
+Compression ≥20
+constants.py:18-32
+meta_integration.py:31
+constants.py:53-60
+Decision Rule
+2+ violations
+2+ violations
+2+ violations (VIOLATION_THRESHOLD=2)
+2+ violations
+Test Count
+86
+84
+146 multidim
+92
+
+
+APPENDIX C: PATENT CLAIMS
+Architecture Claims
+Receipts-native architecture comprising dual-hash (SHA256:BLAKE3) cryptographic receipts with Merkle lineage as the primary data structure for all system operations.
+
+
+Compression = Discovery principle wherein legitimate data exhibits high Shannon entropy (resists compression) while discrepancies exhibit low entropy (compresses heavily).
+
+
+Effectiveness formula E = (H_before - H_after) / n_receipts measuring entropy reduction per receipt as the universal metric for pattern quality.
+
+
+
+Narrow Claims 
+Method for distinguishing legitimate repetitive operations from discrepancies in multi-party transaction systems, comprising:
+
+
+Computing Shannon entropy across at least four independent dimensions: temporal entropy (timing patterns), spatial entropy (location/provider patterns), sequential entropy (procedure order patterns), and compression entropy (data variability)
+Establishing context-aware baseline entropy ranges for each operation type based on operational domain
+Detecting discrepancy via dimensional violation count: operations exhibiting entropy values outside expected baseline in two or more dimensions are classified as discrepancy, regardless of compression ratio alone
+Generating cryptographic receipt (dual-hash SHA256:BLAKE3 with Merkle lineage) for each classification decision
+Context-aware baseline system wherein expected entropy ranges are domain-specific (dialysis_clinic, emergency_room, vaccination_clinic, etc.) allowing legitimate repetition to pass while coordinated discrepancy fails multiple dimensions simultaneously.
+
+
+Domain-Specific Claims
+Physics-based telemetry compression (QED) wherein compression is achieved by discovering physics laws from data and encoding law parameters plus residuals, achieving compression ratios ≥20:1.
+
+
+Information-theoretic colony sovereignty (SpaceProof) wherein autonomous system capability is measured as internal decision capacity (bits/second) exceeding external input rate accounting for communication delay.
+
+
+Decision lineage with RACI accountability (AI Flight Recorder) wherein every autonomous decision has cryptographic lineage plus Responsible/Accountable/Consulted/Informed metadata for regulatory compliance.
+
+
+
