@@ -94,7 +94,7 @@ function getTopology(E, A, T) {
 function topologyColor(topo) {
   if (topo === 'OPEN')   return C.ACCENT_AMBER;
   if (topo === 'HYBRID') return C.ACCENT_BLUE;
-  return C.PASS_MUTED;
+  return C.TEXT_SECONDARY;
 }
 
 function topologyDesc(topo) {
@@ -171,28 +171,29 @@ function App() {
 
   /* ── Styles (inline objects) ── */
   const sRow1 = {
-    height: '20%',
+    flex: '0 0 auto',
     background: C.SURFACE,
     borderBottom: `1px solid ${C.BORDER}`,
     display: 'flex',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '0 20px',
+    padding: '16px 24px',
   };
 
   const sRow2 = {
-    height: '45%',
+    flex: '1 1 auto',
     display: 'flex',
-    gap: '14px',
-    padding: '14px 20px',
+    gap: '16px',
+    padding: '16px 24px',
     alignItems: 'stretch',
   };
 
   const sRow3 = {
-    height: '35%',
+    flex: '0 0 auto',
     borderTop: `1px solid ${C.BORDER}`,
     display: 'flex',
-    gap: '14px',
-    padding: '14px 20px',
+    gap: '16px',
+    padding: '16px 24px',
     alignItems: 'stretch',
   };
 
@@ -200,82 +201,83 @@ function App() {
     background: C.SURFACE,
     border: `1px solid ${C.BORDER}`,
     borderRadius: '4px',
-    padding: '14px 16px',
     display: 'flex',
     flexDirection: 'column',
   };
 
   const sCardHeader = {
     fontFamily: '-apple-system, Segoe UI, Calibri, sans-serif',
-    fontSize: '10.5px',
+    fontSize: '11px',
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
     color: C.TEXT_MUTED,
     marginBottom: '10px',
+    textAlign: 'center',
   };
+
+  /* ── Threshold colors ── */
+  const eColor = E >= 0.85 ? C.ACCENT_AMBER : C.TEXT_PRIMARY;
+  const aColor = A > 0.75  ? C.ACCENT_AMBER : C.TEXT_PRIMARY;
+  const tColor = T > 0.70  ? C.ACCENT_AMBER : C.TEXT_PRIMARY;
 
   /* ── ROW 1: Phase Sequence + Cycle Counter ── */
   const Row1 = (
     <div style={sRow1}>
       {/* Cycle Counter — Left */}
-      <div style={{ width: '12%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <span style={{ fontSize: '10.5px', color: C.TEXT_MUTED, letterSpacing: '0.05em' }}>Cycle</span>
-        <span style={{ fontFamily: 'Consolas, monospace', fontSize: '30px', fontWeight: 700, color: '#FFFFFF', lineHeight: 1.1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+        <span style={{ fontSize: '12px', color: C.TEXT_MUTED, letterSpacing: '0.05em' }}>Cycle</span>
+        <span style={{ fontFamily: 'Consolas, monospace', fontSize: '38px', fontWeight: 700, color: '#FFFFFF', lineHeight: 1.1 }}>
           {cycle}
         </span>
       </div>
 
       {/* Phase Sequence — Center */}
-      <div style={{ width: '70%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0px', flexWrap: 'nowrap' }}>
-        {PHASES.map((p, i) => {
-          const active = i === phase;
-          return (
-            <React.Fragment key={p.name}>
-              {i > 0 && (
-                <span style={{ color: C.TEXT_MUTED, fontSize: '11px', margin: '0 3px', fontFamily: 'Consolas, monospace', flexShrink: 0, alignSelf: 'flex-start', paddingTop: '2px' }}>
-                  {'\u2192'}
-                </span>
-              )}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                <span style={{
-                  fontSize: active ? '15px' : '12px',
-                  fontWeight: active ? 700 : 400,
-                  color: active ? C.TEXT_PRIMARY : C.TEXT_MUTED,
-                  fontFamily: '-apple-system, Segoe UI, Calibri, sans-serif',
-                  letterSpacing: '0.03em',
-                  whiteSpace: 'nowrap',
-                }}>
-                  {p.name}
-                </span>
-                <span style={{
-                  fontSize: '9px',
-                  color: C.TEXT_MUTED,
-                  fontFamily: 'Consolas, monospace',
-                  marginTop: '2px',
-                  whiteSpace: 'nowrap',
-                }}>
-                  {p.receipt}
-                </span>
-                {active && (
-                  <div className="pulse-dot" style={{
-                    width: '5px',
-                    height: '5px',
-                    borderRadius: '50%',
-                    background: C.TEXT_PRIMARY,
-                    marginTop: '3px',
-                  }} />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'nowrap' }}>
+          {PHASES.map((p, i) => {
+            const active = i === phase;
+            return (
+              <React.Fragment key={p.name}>
+                {i > 0 && (
+                  <span style={{ color: C.TEXT_MUTED, fontSize: '16px', margin: '0 8px', fontFamily: 'Consolas, monospace', flexShrink: 0 }}>
+                    {'\u2192'}
+                  </span>
                 )}
-                {!active && <div style={{ width: '5px', height: '5px', marginTop: '3px' }} />}
-              </div>
-            </React.Fragment>
-          );
-        })}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                  <span style={{
+                    fontSize: active ? '26px' : '17px',
+                    fontWeight: active ? 700 : 400,
+                    color: active ? C.TEXT_PRIMARY : C.TEXT_MUTED,
+                    fontFamily: 'Consolas, monospace',
+                    letterSpacing: '0.03em',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {p.name}
+                  </span>
+                  {active && (
+                    <div className="pulse-dot" style={{
+                      width: '5px',
+                      height: '5px',
+                      borderRadius: '50%',
+                      background: C.TEXT_PRIMARY,
+                      marginTop: '3px',
+                    }} />
+                  )}
+                  {!active && <div style={{ width: '5px', height: '5px', marginTop: '3px' }} />}
+                </div>
+              </React.Fragment>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: '11px', color: C.TEXT_MUTED, fontStyle: 'italic', marginTop: '6px' }}>
+          Each phase emits a cryptographic receipt
+        </div>
       </div>
 
       {/* Receipt Counter — Right */}
-      <div style={{ width: '18%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-end' }}>
-        <span style={{ fontSize: '10.5px', color: C.TEXT_MUTED, letterSpacing: '0.05em' }}>Receipts:</span>
-        <span style={{ fontFamily: 'Consolas, monospace', fontSize: '22px', fontWeight: 400, color: C.TEXT_PRIMARY, lineHeight: 1.1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+        <span style={{ fontSize: '12px', color: C.TEXT_MUTED, letterSpacing: '0.05em' }}>Receipts</span>
+        <span style={{ fontFamily: 'Consolas, monospace', fontSize: '38px', fontWeight: 700, color: C.TEXT_PRIMARY, lineHeight: 1.1 }}>
           {receipts}
         </span>
       </div>
@@ -283,35 +285,29 @@ function App() {
   );
 
   /* ── ROW 2: Live Metrics ── */
-  const eColor = E >= 0.85 ? C.ACCENT_AMBER : C.TEXT_PRIMARY;
-  const aColor = A > 0.75  ? C.ACCENT_AMBER : C.TEXT_PRIMARY;
-  const tColor = T > 0.70  ? C.ACCENT_AMBER : C.TEXT_PRIMARY;
-
   const Row2 = (
     <div style={sRow2}>
       {/* Card 1 — Topology */}
-      <div style={{ ...sCard, flex: '1 1 33%' }}>
+      <div style={{ ...sCard, flex: '1 1 33%', padding: '24px', alignItems: 'center', justifyContent: 'center', textAlign: 'center', borderLeft: `4px solid ${topologyColor(topology)}` }}>
         <div style={sCardHeader}>TOPOLOGY</div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{
-            fontFamily: 'Consolas, monospace',
-            fontSize: '40px',
-            fontWeight: 700,
-            color: topologyColor(topology),
-            lineHeight: 1.1,
-          }}>
-            {topology}
-          </div>
-          <div style={{ color: C.TEXT_MUTED, fontSize: '13px', marginTop: '8px' }}>
-            {topologyDesc(topology)}
-          </div>
+        <div style={{
+          fontFamily: 'Consolas, monospace',
+          fontSize: '68px',
+          fontWeight: 700,
+          color: topologyColor(topology),
+          lineHeight: 1.1,
+        }}>
+          {topology}
+        </div>
+        <div style={{ color: C.TEXT_MUTED, fontSize: '14px', marginTop: '10px', textAlign: 'center' }}>
+          {topologyDesc(topology)}
         </div>
       </div>
 
       {/* Card 2 — E/A/T Scores */}
-      <div style={{ ...sCard, flex: '1 1 33%' }}>
+      <div style={{ ...sCard, flex: '1 1 33%', padding: '24px', alignItems: 'center', justifyContent: 'center', textAlign: 'center', borderLeft: `4px solid ${C.ACCENT_BLUE}` }}>
         <div style={sCardHeader}>E / A / T</div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
           {[
             { dim: 'E', val: E, color: eColor },
             { dim: 'A', val: A, color: aColor },
@@ -320,16 +316,15 @@ function App() {
             <div key={dim} style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
               <span style={{
                 fontFamily: 'Consolas, monospace',
-                fontSize: '16px',
+                fontSize: '18px',
                 fontWeight: 700,
                 color: C.ACCENT_BLUE,
-                width: '18px',
               }}>
                 {dim}
               </span>
               <span style={{
                 fontFamily: 'Consolas, monospace',
-                fontSize: '28px',
+                fontSize: '44px',
                 fontWeight: 700,
                 color: color,
                 lineHeight: 1.15,
@@ -342,34 +337,32 @@ function App() {
       </div>
 
       {/* Card 3 — Entropy Conservation */}
-      <div style={{ ...sCard, flex: '1 1 33%' }}>
+      <div style={{ ...sCard, flex: '1 1 33%', padding: '24px', alignItems: 'center', justifyContent: 'center', textAlign: 'center', borderLeft: `4px solid ${C.BORDER}` }}>
         <div style={sCardHeader}>ENTROPY CONSERVATION</div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-            <span style={{ fontFamily: 'Consolas, monospace', fontSize: '15px', color: C.TEXT_SECONDARY }}>
-              abs({'\u0394'}S) =
-            </span>
-            <span style={{
-              fontFamily: 'Consolas, monospace',
-              fontSize: '26px',
-              fontWeight: 700,
-              color: C.TEXT_PRIMARY,
-            }}>
-              {deltaS.toFixed(4)}
-            </span>
-          </div>
-          <div style={{ color: C.TEXT_MUTED, fontSize: '13px', marginTop: '8px' }}>
-            threshold: {'<'} 0.01
-          </div>
-          <div style={{
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', justifyContent: 'center' }}>
+          <span style={{ fontFamily: 'Consolas, monospace', fontSize: '18px', color: C.TEXT_SECONDARY }}>
+            abs({'\u0394'}S) =
+          </span>
+          <span style={{
             fontFamily: 'Consolas, monospace',
-            fontSize: '16px',
+            fontSize: '38px',
             fontWeight: 700,
-            color: C.PASS_MUTED,
-            marginTop: '6px',
+            color: C.TEXT_PRIMARY,
           }}>
-            CONSERVED
-          </div>
+            {deltaS.toFixed(4)}
+          </span>
+        </div>
+        <div style={{ color: C.TEXT_MUTED, fontSize: '14px', marginTop: '10px' }}>
+          threshold: {'<'} 0.01
+        </div>
+        <div style={{
+          fontFamily: 'Consolas, monospace',
+          fontSize: '18px',
+          fontWeight: 700,
+          color: C.TEXT_SECONDARY,
+          marginTop: '8px',
+        }}>
+          CONSERVED
         </div>
       </div>
     </div>
@@ -379,59 +372,59 @@ function App() {
   const Row3 = (
     <div style={sRow3}>
       {/* Left — Topology Classification */}
-      <div style={{ ...sCard, flex: '1 1 48%' }}>
+      <div style={{ ...sCard, flex: '1 1 48%', padding: '20px' }}>
         <div style={{
           fontFamily: 'Georgia, serif',
-          fontSize: '15px',
+          fontSize: '18px',
           fontWeight: 700,
           color: C.TEXT_PRIMARY,
           marginBottom: '12px',
         }}>
           TOPOLOGY CLASSIFICATION
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
-          <div>
-            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '13px', color: C.ACCENT_AMBER }}>OPEN</span>
-            <span style={{ fontSize: '13px', color: C.TEXT_SECONDARY }}> {'\u2192'} Graduate, cascade spawn (self-governing)</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ lineHeight: 1.6 }}>
+            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '15px', color: C.ACCENT_AMBER }}>OPEN</span>
+            <span style={{ fontSize: '15px', color: C.TEXT_SECONDARY }}> {'\u2192'} Graduate, cascade spawn (self-governing)</span>
           </div>
-          <div>
-            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '13px', color: C.ACCENT_BLUE }}>HYBRID</span>
-            <span style={{ fontSize: '13px', color: C.TEXT_SECONDARY }}> {'\u2192'} Transfer cross-domain (adapting)</span>
+          <div style={{ lineHeight: 1.6 }}>
+            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '15px', color: C.ACCENT_BLUE }}>HYBRID</span>
+            <span style={{ fontSize: '15px', color: C.TEXT_SECONDARY }}> {'\u2192'} Transfer cross-domain (adapting)</span>
           </div>
-          <div>
-            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '13px', color: C.PASS_MUTED }}>CLOSED</span>
-            <span style={{ fontSize: '13px', color: C.TEXT_SECONDARY }}> {'\u2192'} Continue optimizing (learning)</span>
+          <div style={{ lineHeight: 1.6 }}>
+            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '15px', color: C.TEXT_SECONDARY }}>CLOSED</span>
+            <span style={{ fontSize: '15px', color: C.TEXT_SECONDARY }}> {'\u2192'} Continue optimizing (learning)</span>
           </div>
         </div>
       </div>
 
       {/* Right — E/A/T Pattern Health */}
-      <div style={{ ...sCard, flex: '1 1 48%' }}>
+      <div style={{ ...sCard, flex: '1 1 48%', padding: '20px' }}>
         <div style={{
           fontFamily: 'Georgia, serif',
-          fontSize: '15px',
+          fontSize: '18px',
           fontWeight: 700,
           color: C.TEXT_PRIMARY,
           marginBottom: '12px',
         }}>
           E/A/T {'\u2014'} THREE DIMENSIONS OF PATTERN HEALTH
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
-          <div style={{ lineHeight: 1.4 }}>
-            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '14px', color: C.ACCENT_BLUE }}>E</span>
-            <span style={{ fontSize: '12.5px', color: C.TEXT_SECONDARY }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ lineHeight: 1.6 }}>
+            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '16px', color: C.ACCENT_BLUE }}>E</span>
+            <span style={{ fontSize: '15px', color: C.TEXT_SECONDARY }}>
               {' '}(Effectiveness): Entropy reduction per receipt {'\u2014'} "Is the system producing order?"
             </span>
           </div>
-          <div style={{ lineHeight: 1.4 }}>
-            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '14px', color: C.ACCENT_BLUE }}>A</span>
-            <span style={{ fontSize: '12.5px', color: C.TEXT_SECONDARY }}>
+          <div style={{ lineHeight: 1.6 }}>
+            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '16px', color: C.ACCENT_BLUE }}>A</span>
+            <span style={{ fontSize: '15px', color: C.TEXT_SECONDARY }}>
               {' '}(Autonomy): Fraction passing gates without human help {'\u2014'} "Can it self-govern?"
             </span>
           </div>
-          <div style={{ lineHeight: 1.4 }}>
-            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '14px', color: C.ACCENT_BLUE }}>T</span>
-            <span style={{ fontSize: '12.5px', color: C.TEXT_SECONDARY }}>
+          <div style={{ lineHeight: 1.6 }}>
+            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '16px', color: C.ACCENT_BLUE }}>T</span>
+            <span style={{ fontSize: '15px', color: C.TEXT_SECONDARY }}>
               {' '}(Transfer): Similarity to known-good patterns cross-domain {'\u2014'} "Does it generalize?"
             </span>
           </div>
@@ -442,7 +435,7 @@ function App() {
 
   /* ── Full Layout ── */
   return (
-    <div style={{ width: '100vw', height: '100vh', background: C.BG, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ maxWidth: '1440px', height: '100vh', margin: '0 auto', padding: '24px 40px', background: C.BG, display: 'flex', flexDirection: 'column' }}>
       {Row1}
       {Row2}
       {Row3}
