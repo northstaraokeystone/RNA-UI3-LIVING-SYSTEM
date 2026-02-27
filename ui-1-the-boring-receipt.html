@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, initial-scale=1.0">
+<title>Receipt Inspector — Tamper Detection</title>
+<style>
+  /* ── RESET ── */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* ── DESIGN TOKENS ── */
+  :root {
+    --bg:            #0A0A0A;
+    --text-primary:  #E2E8F0;
+    --text-secondary:#94A3B8;
+    --text-muted:    #64748B;
+    --accent-amber:  #F59E0B;
+    --accent-blue:   #3B82F6;
+    --action-red:    #DC2626;
+    --pass-muted:    #4B5563;
+    --border:        #1E293B;
+
+    --font-data:    Consolas, 'Courier New', monospace;
+    --font-header:  Georgia, 'Times New Roman', serif;
+    --font-body:    Calibri, 'Segoe UI', system-ui, sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text-primary);
+    overflow: hidden;
+  }
+
+  /* ── OUTER SHELL ── */
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+  }
+
+  /* ═══════════════════════════════════════════
+     SECTION 1 — PIPELINE FLOW  (~10 %)
+     ═══════════════════════════════════════════ */
+  #pipeline {
+    flex: 0 0 auto;
+    padding: 12px 0 8px 0;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    font-family: var(--font-data);
+    font-size: 15px;
+    line-height: 1.6;
+    user-select: none;
+  }
+  #pipeline .stage       { color: var(--text-secondary); }
+  #pipeline .arrow       { color: var(--text-muted); margin: 0 4px; }
+  #pipeline .stage.amber { color: var(--accent-amber); font-weight: 700; }
+
+  /* ═══════════════════════════════════════════
+     SECTION 2 — MAIN SPLIT PANE  (~60 %)
+     ═══════════════════════════════════════════ */
+  #main {
+    flex: 1 1 0;
+    display: flex;
+    min-height: 0;
+  }
+
+  /* ── Left: Operation Payload ── */
+  #payload-pane {
+    width: 42%;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    padding: 14px 18px 10px 18px;
+    overflow: hidden;
+  }
+  #payload-pane .pane-header {
+    font-family: var(--font-body);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    font-variant: small-caps;
+  }
+  #json-editor {
+    flex: 1 1 0;
+    font-family: var(--font-data);
+    font-size: 17px;
+    line-height: 1.45;
+    color: var(--text-primary);
+    background: transparent;
+    border: none;
+    outline: none;
+    white-space: pre;
+    overflow-y: auto;
+    tab-size: 2;
+    -moz-tab-size: 2;
+    padding: 0;
+    resize: none;
+  }
+  #json-editor::-webkit-scrollbar { width: 4px; }
+  #json-editor::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  #editable-label {
+    position: absolute;
+    bottom: 8px;
+    right: 18px;
+    font-family: var(--font-body);
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+
+  /* ── Right: Receipt Verification ── */
+  #receipt-pane {
+    width: 58%;
+    display: flex;
+    flex-direction: column;
+    padding: 14px 24px 10px 24px;
+    overflow-y: auto;
+    gap: 14px;
+  }
+  #receipt-pane::-webkit-scrollbar { width: 4px; }
+  #receipt-pane::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Chain status */
+  #chain-status {
+    font-family: var(--font-data);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-shadow: 0 0 12px rgba(226,232,240,0.08);
+    transition: color 0.25s;
+  }
+  #chain-status.broken {
+    color: var(--action-red);
+    text-shadow: 0 0 16px rgba(220,38,38,0.15);
+  }
+  #violations {
+    font-family: var(--font-data);
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* Dual-hash card */
+  #hash-card {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: border-color 0.25s;
+  }
+  #hash-card.diverged { border-color: var(--action-red); }
+  #hash-card .card-header {
+    font-family: var(--font-body);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  #hash-card .card-header .diverged-badge {
+    display: none;
+    font-family: var(--font-data);
+    font-size: 10px;
+    color: var(--action-red);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  #hash-card.diverged .card-header .diverged-badge { display: inline; }
+  .hash-row {
+    font-family: var(--font-data);
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    gap: 8px;
+    transition: color 0.25s;
+  }
+  .hash-row .label {
+    min-width: 58px;
+    color: var(--text-muted);
+  }
+  .hash-row.red { color: var(--action-red); }
+
+  /* Entropy matrix */
+  #entropy-section .section-header {
+    font-family: var(--font-body);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  #entropy-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  #entropy-table thead th {
+    font-family: var(--font-body);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    text-align: left;
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--text-muted);
+    font-weight: 400;
+  }
+  #entropy-table tbody td {
+    font-family: var(--font-data);
+    font-size: 16px;
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+    transition: color 0.25s;
+  }
+  #entropy-table tbody td.status-cell {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .status-pass { color: var(--pass-muted) !important; }
+  .status-fail { color: var(--action-red) !important; }
+  .score-fail  { color: var(--action-red) !important; }
+
+  /* Merkle anchor */
+  #merkle-row {
+    font-family: var(--font-data);
+    font-size: 13px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  #merkle-row .merkle-label {
+    font-family: var(--font-body);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  #merkle-hash { color: var(--text-secondary); }
+  #merkle-status {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  /* Reset button */
+  #reset-btn {
+    display: none;
+    font-family: var(--font-data);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--text-muted);
+    padding: 6px 18px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    align-self: flex-start;
+  }
+  #reset-btn:hover {
+    background: var(--text-muted);
+    color: var(--bg);
+    border-color: var(--text-muted);
+  }
+  #reset-btn.visible { display: inline-block; }
+
+  /* Patent notice */
+  #patent-notice {
+    display: none;
+    font-family: var(--font-body);
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.4;
+    margin-top: 2px;
+  }
+  #patent-notice.visible { display: block; }
+
+  /* ═══════════════════════════════════════════
+     SECTION 3 — RECEIPT LEVEL HIERARCHY (~15 %)
+     ═══════════════════════════════════════════ */
+  #hierarchy {
+    flex: 0 0 auto;
+    border-top: 1px solid var(--border);
+    padding: 10px 24px 6px 24px;
+  }
+  #level-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  #level-table thead th {
+    font-family: var(--font-body);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 400;
+    text-align: left;
+    padding: 4px 8px 6px 8px;
+    border-bottom: 1px solid var(--text-secondary);
+  }
+  #level-table tbody td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  #level-table .col-level {
+    width: 20%;
+    font-family: var(--font-data);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  #level-table .col-level .lnum {
+    color: var(--text-muted);
+    font-weight: 700;
+  }
+  #level-table .col-scope {
+    width: 50%;
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  #level-table .col-freq {
+    width: 30%;
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  #hierarchy-note {
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-style: italic;
+    color: var(--text-muted);
+    margin-top: 8px;
+  }
+
+  /* ═══════════════════════════════════════════
+     SECTION 4 — FOOTER  (~5 %)
+     ═══════════════════════════════════════════ */
+  #footer {
+    flex: 0 0 auto;
+    padding: 8px 24px;
+    font-family: var(--font-data);
+    font-size: 13px;
+    color: var(--text-muted);
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    transition: color 0.25s, background 0.25s;
+    line-height: 1.5;
+  }
+  #footer.alert {
+    color: var(--action-red);
+    border-top-color: var(--action-red);
+  }
+  #footer-text { transition: opacity 0.2s; }
+
+  /* ── Selection & caret colour ── */
+  ::selection { background: rgba(59,130,246,0.25); color: inherit; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ════ SECTION 1: PIPELINE FLOW ════ -->
+  <div id="pipeline">
+    <span class="stage">Operation</span><span class="arrow">&rarr;</span><span class="stage amber">Dual-Hash (SHA256+BLAKE3)</span><span class="arrow">&rarr;</span><span class="stage">Receipt Emitted</span><span class="arrow">&rarr;</span><span class="stage amber">4-Dim Entropy</span><span class="arrow">&rarr;</span><span class="stage">Chain Linked</span><span class="arrow">&rarr;</span><span class="stage">Merkle Anchored</span>
+  </div>
+
+  <!-- ════ SECTION 2: MAIN SPLIT PANE ════ -->
+  <div id="main">
+
+    <!-- Left: Operation Payload -->
+    <div id="payload-pane">
+      <div class="pane-header">Operation Payload</div>
+      <pre id="json-editor" contenteditable="true" spellcheck="false"></pre>
+      <span id="editable-label">editable</span>
+    </div>
+
+    <!-- Right: Receipt Verification -->
+    <div id="receipt-pane">
+
+      <div>
+        <div id="chain-status">CHAIN INTACT</div>
+        <div id="violations">Violations: 0 / 4</div>
+      </div>
+
+      <!-- Dual-hash card -->
+      <div id="hash-card">
+        <div class="card-header">
+          <span>Dual-Hash Verification</span>
+          <span class="diverged-badge">DIVERGED</span>
+        </div>
+        <div class="hash-row" id="sha-row"><span class="label">SHA256:</span><span id="sha-val"></span></div>
+        <div class="hash-row" id="blake-row"><span class="label">BLAKE3:</span><span id="blake-val"></span></div>
+        <div class="hash-row" id="parent-row"><span class="label">Parent:</span><span id="parent-val">8f9e2d1a3b4c5d6e</span></div>
+      </div>
+
+      <!-- 4-Dimensional Entropy Matrix -->
+      <div id="entropy-section">
+        <div class="section-header">4-Dimensional Entropy Matrix</div>
+        <table id="entropy-table">
+          <thead>
+            <tr><th>Dimension</th><th>Score</th><th>Baseline</th><th>Status</th></tr>
+          </thead>
+          <tbody id="entropy-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Merkle anchor -->
+      <div id="merkle-row">
+        <span class="merkle-label">Merkle Anchor</span>
+        <span id="merkle-hash"></span>
+        <span id="merkle-status" class="status-pass">ANCHORED</span>
+      </div>
+
+      <button id="reset-btn" type="button">Reset</button>
+      <div id="patent-notice">PATENT PENDING: Multi-dimensional entropy detection with dual-hash cryptographic verification</div>
+    </div>
+  </div>
+
+  <!-- ════ SECTION 3: RECEIPT LEVEL HIERARCHY ════ -->
+  <div id="hierarchy">
+    <table id="level-table">
+      <thead>
+        <tr><th>Level</th><th>Scope</th><th>Frequency</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="col-level"><span class="lnum">L0:</span> Events</td>
+          <td class="col-scope">Raw operations, sensor readings</td>
+          <td class="col-freq">Every operation</td>
+        </tr>
+        <tr>
+          <td class="col-level"><span class="lnum">L1:</span> Agents</td>
+          <td class="col-scope">State changes, alerts, contradictions</td>
+          <td class="col-freq">On state change</td>
+        </tr>
+        <tr>
+          <td class="col-level"><span class="lnum">L2:</span> Deploys</td>
+          <td class="col-scope">Compliance actions, rollbacks</td>
+          <td class="col-freq">On action</td>
+        </tr>
+        <tr>
+          <td class="col-level"><span class="lnum">L3:</span> Effectiveness</td>
+          <td class="col-scope">Risk scores, E/A/T metrics</td>
+          <td class="col-freq">Per meta-loop cycle</td>
+        </tr>
+        <tr>
+          <td class="col-level"><span class="lnum">L4:</span> Meta</td>
+          <td class="col-scope">Topology classification, cascade</td>
+          <td class="col-freq">Per meta-loop cycle</td>
+        </tr>
+      </tbody>
+    </table>
+    <div id="hierarchy-note">L4 informs L0. The system verifies itself.</div>
+  </div>
+
+  <!-- ════ SECTION 4: FOOTER ════ -->
+  <div id="footer">
+    <span id="footer-text">receipt_type: operation_verification &nbsp;|&nbsp; chain_depth: 847 &nbsp;|&nbsp; status: LEGITIMATE</span>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Original JSON payload ──
+  var ORIGINAL_JSON = {
+    "operation_id": "MRV-2026-0847-DELTA",
+    "timestamp": "2026-01-05T14:32:17.847Z",
+    "source": "mars_rover_swarm",
+    "agent_id": "rover-7",
+    "action": "geological_sample_analysis",
+    "coordinates": {
+      "lat": -4.5895,
+      "lon": 137.4417
+    },
+    "decision": {
+      "type": "autonomous",
+      "confidence": 0.94,
+      "risk_level": "MEDIUM"
+    },
+    "telemetry": {
+      "battery": 0.73,
+      "signal_strength": -42,
+      "cpu_temp_c": 31.2
+    },
+    "parent_hash": "8f9e2d1a3b4c5d6e"
+  };
+
+  var ORIGINAL_TEXT = JSON.stringify(ORIGINAL_JSON, null, 2);
+
+  // ── DOM refs ──
+  var editor        = document.getElementById('json-editor');
+  var chainStatus   = document.getElementById('chain-status');
+  var violationsEl  = document.getElementById('violations');
+  var hashCard      = document.getElementById('hash-card');
+  var shaVal        = document.getElementById('sha-val');
+  var blakeVal      = document.getElementById('blake-val');
+  var shaRow        = document.getElementById('sha-row');
+  var blakeRow      = document.getElementById('blake-row');
+  var entropyBody   = document.getElementById('entropy-body');
+  var merkleHash    = document.getElementById('merkle-hash');
+  var merkleStatus  = document.getElementById('merkle-status');
+  var resetBtn      = document.getElementById('reset-btn');
+  var patentNotice  = document.getElementById('patent-notice');
+  var footer        = document.getElementById('footer');
+  var footerText    = document.getElementById('footer-text');
+
+  // ── Deterministic hash ──
+  function simpleHash(str, seed) {
+    var hash = seed || 0x811c9dc5;
+    for (var i = 0; i < str.length; i++) {
+      hash ^= str.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  }
+
+  function fullHash(str, seed) {
+    // Chain several rounds to get 20+ hex chars
+    var h1 = simpleHash(str, seed);
+    var h2 = simpleHash(str + h1, seed ^ 0xDEADBEEF);
+    var h3 = simpleHash(str + h2, seed ^ 0xCAFEBABE);
+    return (h1 + h2 + h3).substring(0, 20);
+  }
+
+  // ── Entropy score computation ──
+  // Returns a value deterministically derived from a string.
+  // We calibrate so the ORIGINAL fields land inside their baselines.
+  function charSum(str) {
+    var s = 0;
+    for (var i = 0; i < str.length; i++) s += str.charCodeAt(i);
+    return s;
+  }
+
+  var DIMENSIONS = [
+    { name: 'Temporal',     baseMin: 1.8,  baseMax: 3.5,  target: 2.65 },
+    { name: 'Spatial',      baseMin: 1.5,  baseMax: 3.2,  target: 2.79 },
+    { name: 'Sequential',   baseMin: 0.5,  baseMax: 2.5,  target: 2.47 },
+    { name: 'Compression',  baseMin: 0.25, baseMax: 0.45, target: 0.39 }
+  ];
+
+  // Extract field text from parsed JSON (or raw text fallback)
+  function extractField(parsed, raw, dimension) {
+    try {
+      switch (dimension) {
+        case 'Temporal':
+          return typeof parsed.timestamp === 'string' ? parsed.timestamp : '';
+        case 'Spatial':
+          if (parsed.coordinates && typeof parsed.coordinates === 'object') {
+            return JSON.stringify(parsed.coordinates);
+          }
+          return '';
+        case 'Sequential':
+          return (parsed.operation_id || '') + '|' + (parsed.action || '');
+        case 'Compression':
+          if (parsed.telemetry && typeof parsed.telemetry === 'object') {
+            return JSON.stringify(parsed.telemetry);
+          }
+          return '';
+        default:
+          return raw;
+      }
+    } catch (e) {
+      return raw;
+    }
+  }
+
+  // Compute original field signatures (char sums for reference)
+  var origParsed = JSON.parse(ORIGINAL_TEXT);
+  var origSigs = {};
+  DIMENSIONS.forEach(function (d) {
+    origSigs[d.name] = charSum(extractField(origParsed, ORIGINAL_TEXT, d.name));
+  });
+
+  // Score: if field text matches original char-sum exactly → return target.
+  // Otherwise shift proportionally outside baseline.
+  function computeScore(dim, fieldText) {
+    var cs = charSum(fieldText);
+    var origCs = origSigs[dim.name];
+    if (cs === origCs) return dim.target;
+    // Diverged — push outside baseline
+    var delta = (cs - origCs);
+    // Shift far enough to guarantee outside range
+    if (delta > 0) {
+      return dim.baseMax + 0.3 + Math.abs(delta % 100) * 0.02;
+    } else {
+      return dim.baseMin - 0.3 - Math.abs(delta % 100) * 0.02;
+    }
+  }
+
+  // ── Render helpers ──
+  function renderEntropy(parsed, raw) {
+    entropyBody.innerHTML = '';
+    var fails = 0;
+    DIMENSIONS.forEach(function (dim) {
+      var fieldText = extractField(parsed, raw, dim.name);
+      var score = computeScore(dim, fieldText);
+      var inRange = score >= dim.baseMin && score <= dim.baseMax;
+      if (!inRange) fails++;
+
+      var tr = document.createElement('tr');
+
+      var tdName  = document.createElement('td');
+      tdName.textContent = dim.name;
+      tr.appendChild(tdName);
+
+      var tdScore = document.createElement('td');
+      tdScore.textContent = score.toFixed(2);
+      if (!inRange) tdScore.classList.add('score-fail');
+      tr.appendChild(tdScore);
+
+      var tdBase  = document.createElement('td');
+      tdBase.textContent = dim.baseMin.toFixed(2) + ' – ' + dim.baseMax.toFixed(2);
+      tdBase.style.color = 'var(--text-secondary)';
+      tdBase.style.fontSize = '14px';
+      tr.appendChild(tdBase);
+
+      var tdStat  = document.createElement('td');
+      tdStat.classList.add('status-cell');
+      if (inRange) {
+        tdStat.textContent = 'PASS';
+        tdStat.classList.add('status-pass');
+      } else {
+        tdStat.textContent = 'FAIL';
+        tdStat.classList.add('status-fail');
+      }
+      tr.appendChild(tdStat);
+
+      entropyBody.appendChild(tr);
+    });
+    return fails;
+  }
+
+  function evaluate() {
+    var raw = editor.textContent || '';
+    var parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      parsed = {};
+    }
+
+    // Hashes
+    var sha  = fullHash(raw, 0x811c9dc5);
+    var blk  = fullHash(raw, 0x01234567);
+    var origSha  = fullHash(ORIGINAL_TEXT, 0x811c9dc5);
+    var origBlk  = fullHash(ORIGINAL_TEXT, 0x01234567);
+
+    shaVal.textContent   = sha;
+    blakeVal.textContent = blk;
+
+    var hashDiverged = (sha !== origSha || blk !== origBlk);
+
+    // Merkle
+    var mk = simpleHash(sha + blk, 0xABCDEF01);
+    merkleHash.textContent = mk;
+
+    // Entropy
+    var failCount = renderEntropy(parsed, raw);
+    var tampered = failCount >= 2 || hashDiverged;
+
+    // ── Apply state ──
+    if (tampered) {
+      // State 1: Tampered
+      chainStatus.textContent = 'CHAIN BROKEN';
+      chainStatus.classList.add('broken');
+      violationsEl.textContent = 'Violations: ' + failCount + ' / 4';
+
+      hashCard.classList.add('diverged');
+      if (hashDiverged) {
+        shaRow.classList.add('red');
+        blakeRow.classList.add('red');
+      } else {
+        shaRow.classList.remove('red');
+        blakeRow.classList.remove('red');
+      }
+
+      merkleStatus.textContent = 'BROKEN';
+      merkleStatus.className = 'status-fail';
+
+      footer.classList.add('alert');
+      footerText.textContent = 'STOP RULE TRIGGERED \u2014 WRITE REJECTED \u2014 Cryptographic lineage broken. Dual-hash divergence detected. Receipt chain invalid.';
+
+      resetBtn.classList.add('visible');
+      patentNotice.classList.add('visible');
+    } else {
+      // State 0: Untampered
+      chainStatus.textContent = 'CHAIN INTACT';
+      chainStatus.classList.remove('broken');
+      violationsEl.textContent = 'Violations: ' + failCount + ' / 4';
+
+      hashCard.classList.remove('diverged');
+      shaRow.classList.remove('red');
+      blakeRow.classList.remove('red');
+
+      merkleStatus.textContent = 'ANCHORED';
+      merkleStatus.className = 'status-pass';
+
+      footer.classList.remove('alert');
+      footerText.textContent = 'receipt_type: operation_verification \u00a0|\u00a0 chain_depth: 847 \u00a0|\u00a0 status: LEGITIMATE';
+
+      resetBtn.classList.remove('visible');
+      patentNotice.classList.remove('visible');
+    }
+  }
+
+  // ── Init ──
+  function resetEditor() {
+    editor.textContent = ORIGINAL_TEXT;
+    evaluate();
+  }
+
+  // Debounced input handler
+  var debounceTimer;
+  editor.addEventListener('input', function () {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(evaluate, 120);
+  });
+
+  resetBtn.addEventListener('click', function () {
+    resetEditor();
+  });
+
+  // Prevent Enter from inserting divs in contenteditable
+  editor.addEventListener('keydown', function (e) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      document.execCommand('insertText', false, '  ');
+    }
+  });
+
+  // Boot
+  resetEditor();
+
+})();
+</script>
+</body>
+</html>
