@@ -32,8 +32,8 @@
 
 <script type="text/babel">
 /*
- * UI-3: The Living System — Meta-Loop Simulation
- * Slide 7 integration, optimized for 1400×700 screenshot.
+ * UI-3: The Living System — Meta-Loop Simulation (v1.2)
+ * Engine exposure upgrade: data exhaust, escape velocity bars, thermodynamic ledger.
  *
  * KEYBOARD SHORTCUT (not shown in UI):
  *   Press "J" to jump to cycle 408, phase 2 (CLASSIFY)
@@ -55,16 +55,16 @@ const C = {
   BORDER:        '#1E293B',
 };
 
-/* ── Phase Definitions ── */
+/* ── Phase Definitions (with descriptors) ── */
 const PHASES = [
-  { name: 'SENSE',       receipt: 'sense_receipt' },
-  { name: 'ANALYZE',     receipt: 'analyze_receipt' },
-  { name: 'CLASSIFY',    receipt: 'topology_receipt' },
-  { name: 'HARVEST',     receipt: 'harvest_receipt' },
-  { name: 'HYPOTHESIZE', receipt: 'hypothesis_receipt' },
-  { name: 'GATE',        receipt: 'gate_receipt' },
-  { name: 'ACTUATE',     receipt: 'actuate_receipt' },
-  { name: 'SELECT',      receipt: 'selection_receipt' },
+  { name: 'SENSE',       receipt: 'sense_receipt',      descriptor: 'collect' },
+  { name: 'ANALYZE',     receipt: 'analyze_receipt',    descriptor: 'compute' },
+  { name: 'CLASSIFY',    receipt: 'topology_receipt',   descriptor: 'assign' },
+  { name: 'HARVEST',     receipt: 'harvest_receipt',    descriptor: 'sort' },
+  { name: 'HYPOTHESIZE', receipt: 'hypothesis_receipt', descriptor: 'propose' },
+  { name: 'GATE',        receipt: 'gate_receipt',       descriptor: 'approve' },
+  { name: 'ACTUATE',     receipt: 'actuate_receipt',    descriptor: 'execute' },
+  { name: 'SELECT',      receipt: 'selection_receipt',  descriptor: 'survive' },
 ];
 
 /* ── Seeded E/A/T Progression ── */
@@ -108,6 +108,77 @@ function getDeltaS(cycle, phase) {
   return 0.003 + ((cycle * 7 + phase * 13) % 50) / 10000;
 }
 
+/* ── Thermodynamic Ledger ── */
+function getThermodynamicLedger(cycle) {
+  const hIn = 3.4 + ((cycle * 17 + 31) % 60) / 100 - 0.2;
+  const deltaS = 0.001 + ((cycle * 23 + 7) % 70) / 10000;
+  const hOut = hIn - deltaS;
+  return { hIn, hOut, deltaS };
+}
+
+/* ── Cycle Hash Fragment (hex-looking, deterministic per cycle) ── */
+function getCycleHash(cycle) {
+  const a = ((cycle * 2654435761) >>> 0).toString(16).padStart(8, '0');
+  const b = ((cycle * 340573321) >>> 0).toString(16).padStart(8, '0');
+  return (a + b).slice(0, 10);
+}
+
+/* ── Entropy Sub-Scores for ANALYZE exhaust ── */
+function getEntropyScores(cycle) {
+  const hTemporal   = 2.4 + ((cycle * 13 + 5) % 40) / 100;
+  const hSpatial    = 1.8 + ((cycle * 19 + 11) % 60) / 100;
+  const hSequential = 2.1 + ((cycle * 23 + 7) % 50) / 100;
+  const cRatio      = 0.85 + ((cycle * 11 + 3) % 15) / 100;
+  return { hTemporal, hSpatial, hSequential, cRatio };
+}
+
+/* ── Harvest Queue Counts ── */
+function getHarvestQueue(topology) {
+  if (topology === 'CLOSED') return { open: 0, hybrid: 0, closed: 1 };
+  if (topology === 'HYBRID') return { open: 0, hybrid: 1, closed: 1 };
+  return { open: 1, hybrid: 1, closed: 1 };
+}
+
+/* ── Data Exhaust Line (returns data portion, without phase tag) ── */
+function getExhaustData(phaseIdx, cycle, E, A, T, topology, receipts) {
+  const hash = getCycleHash(cycle);
+  const ent  = getEntropyScores(cycle);
+  const q    = getHarvestQueue(topology);
+  const ds   = getDeltaS(cycle, phaseIdx);
+
+  switch (phaseIdx) {
+    case 0:
+      return `ingest: 3 sources | agent_self_report + external_telemetry + attestation | payload_hash: ${hash}`;
+    case 1:
+      return `H_temporal: ${ent.hTemporal.toFixed(4)} | H_spatial: ${ent.hSpatial.toFixed(4)} | H_sequential: ${ent.hSequential.toFixed(4)} | C_ratio: ${ent.cRatio.toFixed(2)} | violations: 0`;
+    case 2:
+      return `E: ${E.toFixed(2)} | A: ${A.toFixed(2)} | T: ${T.toFixed(2)} | topology_assigned: ${topology} | confidence: 0.94`;
+    case 3:
+      return `queue_sorted: open=${q.open} hybrid=${q.hybrid} closed=${q.closed} | priority: effectiveness_desc`;
+    case 4:
+      return topology === 'OPEN'
+        ? `action_proposed: cascade_spawn | variants: 5 | mutation_rate: 0.05`
+        : `action_proposed: optimize_pattern | risk_tier: LOW | expected_delta_E: +0.02`;
+    case 5:
+      return (A > 0.75 && topology === 'OPEN')
+        ? `approval: auto_approved | RACI: R=system A=meta_loop C=none I=audit_log | risk_score: 0.12`
+        : `approval: HITL_required | RACI: R=system A=meta_loop C=none I=audit_log | risk_score: 0.12`;
+    case 6:
+      return `action_executed: pattern_update | merkle_append: chain_depth=${receipts} | receipt: actuate_receipt`;
+    case 7:
+      return `survivors: 1 | pruned: 0 | entropy_delta: ${ds.toFixed(4)} | conservation: PASS`;
+    default:
+      return '';
+  }
+}
+
+/* ── ASCII Progress Bar (17-char width) ── */
+function getBar(score) {
+  const filled = Math.round((score / 1.0) * 17);
+  const empty  = 17 - filled;
+  return '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
+}
+
 /* ── Receipt accumulator ── */
 function computeReceipts(cycle, phase) {
   let count = 3200;
@@ -133,6 +204,11 @@ function App() {
   const [cycle, setCycle]   = useState(400);
   const [phase, setPhase]   = useState(0);
   const intervalRef         = useRef(null);
+
+  /* Victory Breath state */
+  const prevTopologyRef     = useRef(null);
+  const [topoFlash, setTopoFlash]           = useState(null);
+  const [topoTransition, setTopoTransition] = useState('none');
 
   /* Advance simulation */
   const tick = useCallback(() => {
@@ -167,7 +243,34 @@ function App() {
   const { E, A, T } = getEAT(cycle);
   const topology    = getTopology(E, A, T);
   const receipts    = computeReceipts(cycle, phase);
-  const deltaS      = getDeltaS(cycle, phase);
+  const ledger      = getThermodynamicLedger(cycle);
+  const exhaustData = getExhaustData(phase, cycle, E, A, T, topology, receipts);
+
+  /* Victory Breath — detect topology change */
+  useEffect(() => {
+    const prev = prevTopologyRef.current;
+    prevTopologyRef.current = topology;
+    if (prev === null) return;
+    if (prev === topology) return;
+
+    let timerId;
+    if (topology === 'HYBRID') {
+      setTopoTransition('none');
+      setTopoFlash('#0F1729');
+      timerId = setTimeout(() => {
+        setTopoTransition('background-color 1.5s ease-out');
+        setTopoFlash(null);
+      }, 50);
+    } else if (topology === 'OPEN') {
+      setTopoTransition('none');
+      setTopoFlash('#1A1500');
+      timerId = setTimeout(() => {
+        setTopoTransition('background-color 2.0s ease-out');
+        setTopoFlash(null);
+      }, 50);
+    }
+    return () => { if (timerId) clearTimeout(timerId); };
+  }, [topology]);
 
   /* ── Styles (inline objects) ── */
   const sRow1 = {
@@ -178,6 +281,16 @@ function App() {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '16px 24px',
+  };
+
+  const sExhaust = {
+    flex: '0 0 auto',
+    background: C.BG,
+    borderBottom: `1px solid ${C.BORDER}`,
+    padding: '8px 24px',
+    fontFamily: 'Consolas, monospace',
+    fontSize: '13px',
+    lineHeight: 1.4,
   };
 
   const sRow2 = {
@@ -215,10 +328,15 @@ function App() {
     textAlign: 'center',
   };
 
-  /* ── Threshold colors ── */
+  /* ── Threshold colors for scores ── */
   const eColor = E >= 0.85 ? C.ACCENT_AMBER : C.TEXT_PRIMARY;
   const aColor = A > 0.75  ? C.ACCENT_AMBER : C.TEXT_PRIMARY;
   const tColor = T > 0.70  ? C.ACCENT_AMBER : C.TEXT_PRIMARY;
+
+  /* ── Threshold colors for ASCII bars ── */
+  const eBarColor = E >= 0.85 ? C.ACCENT_AMBER : C.TEXT_SECONDARY;
+  const aBarColor = A > 0.75  ? C.ACCENT_AMBER : C.TEXT_SECONDARY;
+  const tBarColor = T > 0.70  ? C.ACCENT_AMBER : C.TEXT_SECONDARY;
 
   /* ── ROW 1: Phase Sequence + Cycle Counter ── */
   const Row1 = (
@@ -243,7 +361,7 @@ function App() {
                     {'\u2192'}
                   </span>
                 )}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, minHeight: '52px', justifyContent: 'flex-start' }}>
                   <span style={{
                     fontSize: active ? '26px' : '17px',
                     fontWeight: active ? 700 : 400,
@@ -255,6 +373,16 @@ function App() {
                     {p.name}
                   </span>
                   {active && (
+                    <span style={{
+                      fontSize: '11px',
+                      color: C.TEXT_MUTED,
+                      fontStyle: 'italic',
+                      marginTop: '2px',
+                    }}>
+                      {p.descriptor}
+                    </span>
+                  )}
+                  {active && (
                     <div className="pulse-dot" style={{
                       width: '5px',
                       height: '5px',
@@ -263,7 +391,7 @@ function App() {
                       marginTop: '3px',
                     }} />
                   )}
-                  {!active && <div style={{ width: '5px', height: '5px', marginTop: '3px' }} />}
+                  {!active && <div style={{ height: '22px', marginTop: '2px' }} />}
                 </div>
               </React.Fragment>
             );
@@ -284,11 +412,29 @@ function App() {
     </div>
   );
 
+  /* ── DATA EXHAUST STRIP (Row 1.5) ── */
+  const ExhaustStrip = (
+    <div style={sExhaust}>
+      <span style={{ color: C.TEXT_MUTED }}>[{PHASES[phase].name}]</span>
+      <span style={{ color: C.TEXT_SECONDARY }}>{'  '}{exhaustData}</span>
+    </div>
+  );
+
   /* ── ROW 2: Live Metrics ── */
   const Row2 = (
     <div style={sRow2}>
-      {/* Card 1 — Topology */}
-      <div style={{ ...sCard, flex: '1 1 33%', padding: '24px', alignItems: 'center', justifyContent: 'center', textAlign: 'center', borderLeft: `4px solid ${topologyColor(topology)}` }}>
+      {/* Card 1 — Topology (with Victory Breath) */}
+      <div style={{
+        ...sCard,
+        flex: '1 1 33%',
+        padding: '24px',
+        alignItems: 'center',
+        justifyContent: 'center',
+        textAlign: 'center',
+        borderLeft: `4px solid ${topologyColor(topology)}`,
+        background: topoFlash || C.SURFACE,
+        transition: topoTransition,
+      }}>
         <div style={sCardHeader}>TOPOLOGY</div>
         <div style={{
           fontFamily: 'Consolas, monospace',
@@ -304,21 +450,23 @@ function App() {
         </div>
       </div>
 
-      {/* Card 2 — E/A/T Scores */}
+      {/* Card 2 — E/A/T Scores with Escape Velocity ASCII Bars */}
       <div style={{ ...sCard, flex: '1 1 33%', padding: '24px', alignItems: 'center', justifyContent: 'center', textAlign: 'center', borderLeft: `4px solid ${C.ACCENT_BLUE}` }}>
         <div style={sCardHeader}>E / A / T</div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
           {[
-            { dim: 'E', val: E, color: eColor },
-            { dim: 'A', val: A, color: aColor },
-            { dim: 'T', val: T, color: tColor },
-          ].map(({ dim, val, color }) => (
-            <div key={dim} style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
+            { dim: 'E', val: E, color: eColor, barColor: eBarColor },
+            { dim: 'A', val: A, color: aColor, barColor: aBarColor },
+            { dim: 'T', val: T, color: tColor, barColor: tBarColor },
+          ].map(({ dim, val, color, barColor }) => (
+            <div key={dim} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{
                 fontFamily: 'Consolas, monospace',
                 fontSize: '18px',
                 fontWeight: 700,
                 color: C.ACCENT_BLUE,
+                width: '16px',
+                textAlign: 'right',
               }}>
                 {dim}
               </span>
@@ -328,31 +476,43 @@ function App() {
                 fontWeight: 700,
                 color: color,
                 lineHeight: 1.15,
+                width: '120px',
+                textAlign: 'left',
               }}>
                 {val.toFixed(2)}
+              </span>
+              <span style={{
+                fontFamily: 'Consolas, monospace',
+                fontSize: '16px',
+                color: barColor,
+                lineHeight: 1,
+              }}>
+                {getBar(val)}
               </span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Card 3 — Entropy Conservation */}
+      {/* Card 3 — Thermodynamic Ledger */}
       <div style={{ ...sCard, flex: '1 1 33%', padding: '24px', alignItems: 'center', justifyContent: 'center', textAlign: 'center', borderLeft: `4px solid ${C.BORDER}` }}>
         <div style={sCardHeader}>ENTROPY CONSERVATION</div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', justifyContent: 'center' }}>
-          <span style={{ fontFamily: 'Consolas, monospace', fontSize: '18px', color: C.TEXT_SECONDARY }}>
-            abs({'\u0394'}S) =
-          </span>
-          <span style={{
-            fontFamily: 'Consolas, monospace',
-            fontSize: '38px',
-            fontWeight: 700,
-            color: C.TEXT_PRIMARY,
-          }}>
-            {deltaS.toFixed(4)}
-          </span>
+        <div style={{ fontFamily: 'Consolas, monospace', width: '220px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
+            <span style={{ color: C.TEXT_MUTED, fontSize: '14px' }}>H_in</span>
+            <span style={{ color: C.TEXT_PRIMARY, fontSize: '26px' }}>{ledger.hIn.toFixed(4)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
+            <span style={{ color: C.TEXT_MUTED, fontSize: '14px' }}>H_out</span>
+            <span style={{ color: C.TEXT_PRIMARY, fontSize: '26px' }}>{ledger.hOut.toFixed(4)}</span>
+          </div>
+          <div style={{ borderTop: `1px solid ${C.BORDER}`, marginBottom: '8px' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span style={{ color: C.TEXT_MUTED, fontSize: '14px' }}>{'\u0394'}S</span>
+            <span style={{ color: C.TEXT_PRIMARY, fontSize: '32px', fontWeight: 700 }}>{ledger.deltaS.toFixed(4)}</span>
+          </div>
         </div>
-        <div style={{ color: C.TEXT_MUTED, fontSize: '14px', marginTop: '10px' }}>
+        <div style={{ color: C.TEXT_MUTED, fontSize: '13px', marginTop: '10px' }}>
           threshold: {'<'} 0.01
         </div>
         <div style={{
@@ -360,7 +520,7 @@ function App() {
           fontSize: '18px',
           fontWeight: 700,
           color: C.TEXT_SECONDARY,
-          marginTop: '8px',
+          marginTop: '6px',
         }}>
           CONSERVED
         </div>
@@ -437,6 +597,7 @@ function App() {
   return (
     <div style={{ maxWidth: '1440px', height: '100vh', margin: '0 auto', padding: '24px 40px', background: C.BG, display: 'flex', flexDirection: 'column' }}>
       {Row1}
+      {ExhaustStrip}
       {Row2}
       {Row3}
     </div>
