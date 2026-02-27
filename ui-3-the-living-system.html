@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1400, height=700" />
+<title>UI-3 — The Living System</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body, #root {
+    width: 100%; height: 100%;
+    background: #0A0A0A;
+    color: #E2E8F0;
+    font-family: -apple-system, 'Segoe UI', Calibri, sans-serif;
+    overflow: hidden;
+  }
+
+  @keyframes emissionPulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+
+  .pulse-dot {
+    animation: emissionPulse 500ms ease-in-out infinite;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+/*
+ * UI-3: The Living System — Meta-Loop Simulation
+ * Slide 7 integration, optimized for 1400×700 screenshot.
+ *
+ * KEYBOARD SHORTCUT (not shown in UI):
+ *   Press "J" to jump to cycle 408, phase 2 (CLASSIFY)
+ *   This is the "money shot": OPEN topology, all E/A/T thresholds crossed.
+ */
+
+const { useState, useEffect, useCallback, useRef } = React;
+
+/* ── Design Tokens ── */
+const C = {
+  BG:            '#0A0A0A',
+  SURFACE:       '#141414',
+  TEXT_PRIMARY:  '#E2E8F0',
+  TEXT_SECONDARY:'#94A3B8',
+  TEXT_MUTED:    '#64748B',
+  ACCENT_BLUE:   '#3B82F6',
+  ACCENT_AMBER:  '#F59E0B',
+  PASS_MUTED:    '#4B5563',
+  BORDER:        '#1E293B',
+};
+
+/* ── Phase Definitions ── */
+const PHASES = [
+  { name: 'SENSE',       receipt: 'sense_receipt' },
+  { name: 'ANALYZE',     receipt: 'analyze_receipt' },
+  { name: 'CLASSIFY',    receipt: 'topology_receipt' },
+  { name: 'HARVEST',     receipt: 'harvest_receipt' },
+  { name: 'HYPOTHESIZE', receipt: 'hypothesis_receipt' },
+  { name: 'GATE',        receipt: 'gate_receipt' },
+  { name: 'ACTUATE',     receipt: 'actuate_receipt' },
+  { name: 'SELECT',      receipt: 'selection_receipt' },
+];
+
+/* ── Seeded E/A/T Progression ── */
+function getEAT(cycle) {
+  if (cycle <= 400) return { E: 0.78, A: 0.68, T: 0.58 };
+  if (cycle === 401) return { E: 0.79, A: 0.69, T: 0.60 };
+  if (cycle === 402) return { E: 0.80, A: 0.70, T: 0.62 };
+  if (cycle === 403) return { E: 0.81, A: 0.71, T: 0.65 };
+  if (cycle === 404) return { E: 0.82, A: 0.72, T: 0.68 };
+  if (cycle === 405) return { E: 0.83, A: 0.73, T: 0.71 };
+  if (cycle === 406) return { E: 0.84, A: 0.74, T: 0.72 };
+  if (cycle === 407) return { E: 0.85, A: 0.75, T: 0.74 };
+  if (cycle === 408) return { E: 0.87, A: 0.76, T: 0.75 };
+  if (cycle === 409) return { E: 0.88, A: 0.77, T: 0.76 };
+  if (cycle === 410) return { E: 0.89, A: 0.78, T: 0.77 };
+  /* 411+ plateau */
+  return { E: 0.90, A: 0.79, T: 0.78 };
+}
+
+/* ── Topology Classification ── */
+function getTopology(E, A, T) {
+  if (E >= 0.85 && A > 0.75) return 'OPEN';
+  if (T > 0.70) return 'HYBRID';
+  return 'CLOSED';
+}
+
+function topologyColor(topo) {
+  if (topo === 'OPEN')   return C.ACCENT_AMBER;
+  if (topo === 'HYBRID') return C.ACCENT_BLUE;
+  return C.PASS_MUTED;
+}
+
+function topologyDesc(topo) {
+  if (topo === 'OPEN')   return 'graduated \u2014 self-governing';
+  if (topo === 'HYBRID') return 'transferring cross-domain';
+  return 'optimizing internally';
+}
+
+/* ── Entropy Conservation (seeded pseudo-random) ── */
+function getDeltaS(cycle, phase) {
+  return 0.003 + ((cycle * 7 + phase * 13) % 50) / 10000;
+}
+
+/* ── Receipt accumulator ── */
+function computeReceipts(cycle, phase) {
+  let count = 3200;
+  /* Full cycles from 400 up to (cycle - 1) */
+  for (let c = 400; c < cycle; c++) {
+    const { E, A, T } = getEAT(c);
+    const topo = getTopology(E, A, T);
+    const bonus = topo === 'OPEN' ? 5 : topo === 'HYBRID' ? 1 : 0;
+    count += 8 * (1 + bonus);
+  }
+  /* Current cycle phases 0..phase */
+  const { E, A, T } = getEAT(cycle);
+  const topo = getTopology(E, A, T);
+  const bonus = topo === 'OPEN' ? 5 : topo === 'HYBRID' ? 1 : 0;
+  count += (phase + 1) * (1 + bonus);
+  return count;
+}
+
+/* ────────────────────────────────────────────────── */
+/*  Main App Component                                */
+/* ────────────────────────────────────────────────── */
+function App() {
+  const [cycle, setCycle]   = useState(400);
+  const [phase, setPhase]   = useState(0);
+  const intervalRef         = useRef(null);
+
+  /* Advance simulation */
+  const tick = useCallback(() => {
+    setPhase(prev => {
+      if (prev >= 7) {
+        setCycle(c => c + 1);
+        return 0;
+      }
+      return prev + 1;
+    });
+  }, []);
+
+  /* Start interval */
+  useEffect(() => {
+    intervalRef.current = setInterval(tick, 2000);
+    return () => clearInterval(intervalRef.current);
+  }, [tick]);
+
+  /* "J" key — jump to money shot (cycle 408, phase 2 = CLASSIFY) */
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'j' || e.key === 'J') {
+        setCycle(408);
+        setPhase(2);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  /* Derived state */
+  const { E, A, T } = getEAT(cycle);
+  const topology    = getTopology(E, A, T);
+  const receipts    = computeReceipts(cycle, phase);
+  const deltaS      = getDeltaS(cycle, phase);
+
+  /* ── Styles (inline objects) ── */
+  const sRow1 = {
+    height: '20%',
+    background: C.SURFACE,
+    borderBottom: `1px solid ${C.BORDER}`,
+    display: 'flex',
+    alignItems: 'center',
+    padding: '0 20px',
+  };
+
+  const sRow2 = {
+    height: '45%',
+    display: 'flex',
+    gap: '14px',
+    padding: '14px 20px',
+    alignItems: 'stretch',
+  };
+
+  const sRow3 = {
+    height: '35%',
+    borderTop: `1px solid ${C.BORDER}`,
+    display: 'flex',
+    gap: '14px',
+    padding: '14px 20px',
+    alignItems: 'stretch',
+  };
+
+  const sCard = {
+    background: C.SURFACE,
+    border: `1px solid ${C.BORDER}`,
+    borderRadius: '4px',
+    padding: '14px 16px',
+    display: 'flex',
+    flexDirection: 'column',
+  };
+
+  const sCardHeader = {
+    fontFamily: '-apple-system, Segoe UI, Calibri, sans-serif',
+    fontSize: '10.5px',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: C.TEXT_MUTED,
+    marginBottom: '10px',
+  };
+
+  /* ── ROW 1: Phase Sequence + Cycle Counter ── */
+  const Row1 = (
+    <div style={sRow1}>
+      {/* Cycle Counter — Left */}
+      <div style={{ width: '12%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <span style={{ fontSize: '10.5px', color: C.TEXT_MUTED, letterSpacing: '0.05em' }}>Cycle</span>
+        <span style={{ fontFamily: 'Consolas, monospace', fontSize: '30px', fontWeight: 700, color: '#FFFFFF', lineHeight: 1.1 }}>
+          {cycle}
+        </span>
+      </div>
+
+      {/* Phase Sequence — Center */}
+      <div style={{ width: '70%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0px', flexWrap: 'nowrap' }}>
+        {PHASES.map((p, i) => {
+          const active = i === phase;
+          return (
+            <React.Fragment key={p.name}>
+              {i > 0 && (
+                <span style={{ color: C.TEXT_MUTED, fontSize: '11px', margin: '0 3px', fontFamily: 'Consolas, monospace', flexShrink: 0, alignSelf: 'flex-start', paddingTop: '2px' }}>
+                  {'\u2192'}
+                </span>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                <span style={{
+                  fontSize: active ? '15px' : '12px',
+                  fontWeight: active ? 700 : 400,
+                  color: active ? C.TEXT_PRIMARY : C.TEXT_MUTED,
+                  fontFamily: '-apple-system, Segoe UI, Calibri, sans-serif',
+                  letterSpacing: '0.03em',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {p.name}
+                </span>
+                <span style={{
+                  fontSize: '9px',
+                  color: C.TEXT_MUTED,
+                  fontFamily: 'Consolas, monospace',
+                  marginTop: '2px',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {p.receipt}
+                </span>
+                {active && (
+                  <div className="pulse-dot" style={{
+                    width: '5px',
+                    height: '5px',
+                    borderRadius: '50%',
+                    background: C.TEXT_PRIMARY,
+                    marginTop: '3px',
+                  }} />
+                )}
+                {!active && <div style={{ width: '5px', height: '5px', marginTop: '3px' }} />}
+              </div>
+            </React.Fragment>
+          );
+        })}
+      </div>
+
+      {/* Receipt Counter — Right */}
+      <div style={{ width: '18%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-end' }}>
+        <span style={{ fontSize: '10.5px', color: C.TEXT_MUTED, letterSpacing: '0.05em' }}>Receipts:</span>
+        <span style={{ fontFamily: 'Consolas, monospace', fontSize: '22px', fontWeight: 400, color: C.TEXT_PRIMARY, lineHeight: 1.1 }}>
+          {receipts}
+        </span>
+      </div>
+    </div>
+  );
+
+  /* ── ROW 2: Live Metrics ── */
+  const eColor = E >= 0.85 ? C.ACCENT_AMBER : C.TEXT_PRIMARY;
+  const aColor = A > 0.75  ? C.ACCENT_AMBER : C.TEXT_PRIMARY;
+  const tColor = T > 0.70  ? C.ACCENT_AMBER : C.TEXT_PRIMARY;
+
+  const Row2 = (
+    <div style={sRow2}>
+      {/* Card 1 — Topology */}
+      <div style={{ ...sCard, flex: '1 1 33%' }}>
+        <div style={sCardHeader}>TOPOLOGY</div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{
+            fontFamily: 'Consolas, monospace',
+            fontSize: '40px',
+            fontWeight: 700,
+            color: topologyColor(topology),
+            lineHeight: 1.1,
+          }}>
+            {topology}
+          </div>
+          <div style={{ color: C.TEXT_MUTED, fontSize: '13px', marginTop: '8px' }}>
+            {topologyDesc(topology)}
+          </div>
+        </div>
+      </div>
+
+      {/* Card 2 — E/A/T Scores */}
+      <div style={{ ...sCard, flex: '1 1 33%' }}>
+        <div style={sCardHeader}>E / A / T</div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '6px' }}>
+          {[
+            { dim: 'E', val: E, color: eColor },
+            { dim: 'A', val: A, color: aColor },
+            { dim: 'T', val: T, color: tColor },
+          ].map(({ dim, val, color }) => (
+            <div key={dim} style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
+              <span style={{
+                fontFamily: 'Consolas, monospace',
+                fontSize: '16px',
+                fontWeight: 700,
+                color: C.ACCENT_BLUE,
+                width: '18px',
+              }}>
+                {dim}
+              </span>
+              <span style={{
+                fontFamily: 'Consolas, monospace',
+                fontSize: '28px',
+                fontWeight: 700,
+                color: color,
+                lineHeight: 1.15,
+              }}>
+                {val.toFixed(2)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Card 3 — Entropy Conservation */}
+      <div style={{ ...sCard, flex: '1 1 33%' }}>
+        <div style={sCardHeader}>ENTROPY CONSERVATION</div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+            <span style={{ fontFamily: 'Consolas, monospace', fontSize: '15px', color: C.TEXT_SECONDARY }}>
+              abs({'\u0394'}S) =
+            </span>
+            <span style={{
+              fontFamily: 'Consolas, monospace',
+              fontSize: '26px',
+              fontWeight: 700,
+              color: C.TEXT_PRIMARY,
+            }}>
+              {deltaS.toFixed(4)}
+            </span>
+          </div>
+          <div style={{ color: C.TEXT_MUTED, fontSize: '13px', marginTop: '8px' }}>
+            threshold: {'<'} 0.01
+          </div>
+          <div style={{
+            fontFamily: 'Consolas, monospace',
+            fontSize: '16px',
+            fontWeight: 700,
+            color: C.PASS_MUTED,
+            marginTop: '6px',
+          }}>
+            CONSERVED
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ── ROW 3: Reference Cards ── */
+  const Row3 = (
+    <div style={sRow3}>
+      {/* Left — Topology Classification */}
+      <div style={{ ...sCard, flex: '1 1 48%' }}>
+        <div style={{
+          fontFamily: 'Georgia, serif',
+          fontSize: '15px',
+          fontWeight: 700,
+          color: C.TEXT_PRIMARY,
+          marginBottom: '12px',
+        }}>
+          TOPOLOGY CLASSIFICATION
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
+          <div>
+            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '13px', color: C.ACCENT_AMBER }}>OPEN</span>
+            <span style={{ fontSize: '13px', color: C.TEXT_SECONDARY }}> {'\u2192'} Graduate, cascade spawn (self-governing)</span>
+          </div>
+          <div>
+            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '13px', color: C.ACCENT_BLUE }}>HYBRID</span>
+            <span style={{ fontSize: '13px', color: C.TEXT_SECONDARY }}> {'\u2192'} Transfer cross-domain (adapting)</span>
+          </div>
+          <div>
+            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '13px', color: C.PASS_MUTED }}>CLOSED</span>
+            <span style={{ fontSize: '13px', color: C.TEXT_SECONDARY }}> {'\u2192'} Continue optimizing (learning)</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Right — E/A/T Pattern Health */}
+      <div style={{ ...sCard, flex: '1 1 48%' }}>
+        <div style={{
+          fontFamily: 'Georgia, serif',
+          fontSize: '15px',
+          fontWeight: 700,
+          color: C.TEXT_PRIMARY,
+          marginBottom: '12px',
+        }}>
+          E/A/T {'\u2014'} THREE DIMENSIONS OF PATTERN HEALTH
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
+          <div style={{ lineHeight: 1.4 }}>
+            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '14px', color: C.ACCENT_BLUE }}>E</span>
+            <span style={{ fontSize: '12.5px', color: C.TEXT_SECONDARY }}>
+              {' '}(Effectiveness): Entropy reduction per receipt {'\u2014'} "Is the system producing order?"
+            </span>
+          </div>
+          <div style={{ lineHeight: 1.4 }}>
+            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '14px', color: C.ACCENT_BLUE }}>A</span>
+            <span style={{ fontSize: '12.5px', color: C.TEXT_SECONDARY }}>
+              {' '}(Autonomy): Fraction passing gates without human help {'\u2014'} "Can it self-govern?"
+            </span>
+          </div>
+          <div style={{ lineHeight: 1.4 }}>
+            <span style={{ fontFamily: 'Consolas, monospace', fontWeight: 700, fontSize: '14px', color: C.ACCENT_BLUE }}>T</span>
+            <span style={{ fontSize: '12.5px', color: C.TEXT_SECONDARY }}>
+              {' '}(Transfer): Similarity to known-good patterns cross-domain {'\u2014'} "Does it generalize?"
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ── Full Layout ── */
+  return (
+    <div style={{ width: '100vw', height: '100vh', background: C.BG, display: 'flex', flexDirection: 'column' }}>
+      {Row1}
+      {Row2}
+      {Row3}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
