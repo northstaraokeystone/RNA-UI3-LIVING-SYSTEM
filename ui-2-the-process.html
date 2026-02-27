@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440, initial-scale=1.0">
+<title>UI-2: The Process — Receipts-Native Build Methodology</title>
+<style>
+/* ═══════════════════════════════════════════════════════
+   DESIGN TOKENS
+   ═══════════════════════════════════════════════════════ */
+:root {
+  --bg: #0A0A0A;
+  --surface: #141414;
+  --prompt-green: #4ADE80;
+  --text-primary: #E2E8F0;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --accent-amber: #F59E0B;
+  --accent-blue: #3B82F6;
+  --accent-red: #DC2626;
+  --white: #FFFFFF;
+  --border: #1E293B;
+  --font-data: Consolas, 'Courier New', monospace;
+  --font-header: Georgia, Cambria, serif;
+  --font-body: Calibri, 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ═══════════════════════════════════════════════════════
+   RESET & BASE
+   ═══════════════════════════════════════════════════════ */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-data);
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════
+   LAYOUT
+   ═══════════════════════════════════════════════════════ */
+#container {
+  max-width: 1440px;
+  margin: 0 auto;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ═══════════════════════════════════════════════════════
+   TERMINAL WINDOW
+   ═══════════════════════════════════════════════════════ */
+#terminal {
+  flex: 1 1 0;
+  background: var(--bg);
+  overflow: hidden;
+  position: relative;
+  padding: 16px 24px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+#terminal-inner {
+  position: absolute;
+  bottom: 16px;
+  left: 24px;
+  right: 24px;
+  max-height: calc(100% - 32px);
+  overflow: hidden;
+}
+.line {
+  white-space: pre-wrap;
+  word-break: break-all;
+  min-height: 1.5em;
+}
+.prompt { color: var(--prompt-green); font-weight: bold; }
+.output { color: var(--text-primary); }
+.secondary { color: var(--text-secondary); }
+.muted { color: var(--text-muted); }
+.amber { color: var(--accent-amber); }
+.blue { color: var(--accent-blue); }
+.white-bold { color: var(--white); font-weight: bold; }
+.amber-bold { color: var(--accent-amber); font-weight: bold; }
+.italic { font-style: italic; }
+.cursor {
+  display: inline-block;
+  width: 9px;
+  height: 1.2em;
+  background: var(--text-primary);
+  vertical-align: text-bottom;
+  margin-left: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   INFO STRIP
+   ═══════════════════════════════════════════════════════ */
+#info-strip {
+  flex: 0 0 auto;
+  background: var(--surface);
+  display: flex;
+  border-top: 1px solid var(--border);
+}
+.info-cell {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.info-cell + .info-cell {
+  border-left: 1px solid var(--border);
+}
+.info-cell:nth-child(1) { flex: 0 0 25%; }
+.info-cell:nth-child(2) { flex: 0 0 30%; }
+.info-cell:nth-child(3) { flex: 0 0 20%; }
+.info-cell:nth-child(4) { flex: 0 0 25%; }
+.info-label {
+  font-family: var(--font-data);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.info-value {
+  font-family: var(--font-data);
+  font-size: 16px;
+  color: var(--text-primary);
+}
+.info-value.large {
+  font-size: 26px;
+  color: var(--accent-amber);
+}
+.info-value.small {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.gate-indicator { display: inline-block; margin-right: 8px; }
+.gate-pending { color: var(--text-muted); }
+.gate-pass { color: var(--accent-amber); }
+</style>
+</head>
+<body>
+<div id="container">
+  <div id="terminal">
+    <div id="terminal-inner"></div>
+  </div>
+  <div id="info-strip">
+    <div class="info-cell">
+      <div class="info-label">Build Stage</div>
+      <div class="info-value" id="info-stage">—</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Gates</div>
+      <div class="info-value" id="info-gates">
+        <span class="gate-indicator gate-pending">T+2h ░░</span>
+        <span class="gate-indicator gate-pending">T+24h ░░</span>
+        <span class="gate-indicator gate-pending">T+48h ░░</span>
+      </div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Receipts</div>
+      <div class="info-value large" id="info-receipts">0</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Session</div>
+      <div class="info-value small" id="info-stats">—</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ═══════════════════════════════════════════════════════
+     STATE
+     ═══════════════════════════════════════════════════════ */
+  var terminalInner = document.getElementById('terminal-inner');
+  var infoStage = document.getElementById('info-stage');
+  var infoGates = document.getElementById('info-gates');
+  var infoReceipts = document.getElementById('info-receipts');
+  var infoStats = document.getElementById('info-stats');
+
+  var paused = false;
+  var receiptCount = 0;
+  var queue = [];
+  var queueIndex = 0;
+  var running = false;
+  var currentTypingLine = null;
+  var finished = false;
+  var maxLines = 30;
+
+  /* ═══════════════════════════════════════════════════════
+     DOM HELPERS
+     ═══════════════════════════════════════════════════════ */
+  function addLine(html) {
+    var div = document.createElement('div');
+    div.className = 'line';
+    div.innerHTML = html || '&nbsp;';
+    terminalInner.appendChild(div);
+    trimLines();
+    return div;
+  }
+
+  function trimLines() {
+    while (terminalInner.children.length > maxLines) {
+      terminalInner.removeChild(terminalInner.firstChild);
+    }
+  }
+
+  function clearTerminal() {
+    terminalInner.innerHTML = '';
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     INFO STRIP UPDATES
+     ═══════════════════════════════════════════════════════ */
+  function setStage(text) { infoStage.textContent = text; }
+  function setReceipts(n) { receiptCount = n; infoReceipts.textContent = String(n); }
+  function incrReceipts() { receiptCount++; infoReceipts.textContent = String(receiptCount); }
+  function setStats(text) { infoStats.textContent = text; }
+
+  function setGates(g1, g2, g3) {
+    var h = '';
+    h += g1 ? '<span class="gate-indicator gate-pass">T+2h \u2588\u2588 PASS</span>'
+            : '<span class="gate-indicator gate-pending">T+2h \u2591\u2591</span>';
+    h += g2 ? '<span class="gate-indicator gate-pass">T+24h \u2588\u2588 PASS</span>'
+            : '<span class="gate-indicator gate-pending">T+24h \u2591\u2591</span>';
+    h += g3 ? '<span class="gate-indicator gate-pass">T+48h \u2588\u2588 PASS</span>'
+            : '<span class="gate-indicator gate-pending">T+48h \u2591\u2591</span>';
+    infoGates.innerHTML = h;
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     PAUSE-AWARE DELAY
+     ═══════════════════════════════════════════════════════ */
+  function delay(ms) {
+    return new Promise(function(resolve) {
+      function tick() {
+        if (paused) { setTimeout(tick, 50); return; }
+        resolve();
+      }
+      setTimeout(tick, ms);
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     TYPING EFFECT
+     ═══════════════════════════════════════════════════════ */
+  function typePrompt(text) {
+    return new Promise(function(resolve) {
+      var div = document.createElement('div');
+      div.className = 'line';
+      terminalInner.appendChild(div);
+      trimLines();
+      currentTypingLine = div;
+      var chars = text.split('');
+      var idx = 0;
+      function typeNext() {
+        if (paused) { setTimeout(typeNext, 50); return; }
+        if (idx < chars.length) {
+          var so_far = chars.slice(0, idx + 1).join('');
+          div.innerHTML = '<span class="prompt">$ ' + escapeHtml(so_far) + '</span><span class="cursor"></span>';
+          idx++;
+          setTimeout(typeNext, 40);
+        } else {
+          div.innerHTML = '<span class="prompt">$ ' + escapeHtml(text) + '</span>';
+          currentTypingLine = null;
+          resolve();
+        }
+      }
+      typeNext();
+    });
+  }
+
+  function typeComment(text) {
+    return new Promise(function(resolve) {
+      var div = document.createElement('div');
+      div.className = 'line';
+      terminalInner.appendChild(div);
+      trimLines();
+      currentTypingLine = div;
+      var full = '# ' + text;
+      var chars = full.split('');
+      var idx = 0;
+      function typeNext() {
+        if (paused) { setTimeout(typeNext, 50); return; }
+        if (idx < chars.length) {
+          var so_far = chars.slice(0, idx + 1).join('');
+          div.innerHTML = '<span class="prompt">$ ' + escapeHtml(so_far) + '</span><span class="cursor"></span>';
+          idx++;
+          setTimeout(typeNext, 40);
+        } else {
+          div.innerHTML = '<span class="prompt">$ ' + escapeHtml(full) + '</span>';
+          currentTypingLine = null;
+          resolve();
+        }
+      }
+      typeNext();
+    });
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     OUTPUT HELPERS
+     ═══════════════════════════════════════════════════════ */
+  function out(html, ms) {
+    ms = ms || 200;
+    return delay(ms).then(function() { addLine(html); });
+  }
+
+  function outReceipt(text) {
+    return delay(300).then(function() {
+      addLine('<span class="amber">receipt emitted: ' + escapeHtml(text) + '</span>');
+      incrReceipts();
+    });
+  }
+
+  function divider() {
+    return delay(500).then(function() {
+      addLine('<span class="muted">\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500</span>');
+      return delay(2000);
+    });
+  }
+
+  function banner(text, rightText) {
+    var right = rightText ? '  ' + rightText : '';
+    return '<span class="amber-bold">  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550</span>\n' +
+           '<span class="amber-bold">  ' + escapeHtml(text) + escapeHtml(right) + '</span>\n' +
+           '<span class="amber-bold">  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550</span>';
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     ACT DEFINITIONS
+     ═══════════════════════════════════════════════════════ */
+
+  /* ── ACT 1: THE IDEA ── */
+  function act1() {
+    setStage('1/7 \u2014 IDEA');
+    setGates(false, false, false);
+    setReceipts(0);
+    setStats('Session start: 2026-02-27T09:00:00Z');
+
+    return typeComment('\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550')
+      .then(function() { return delay(500); })
+      .then(function() { return typeComment('RECEIPTS-NATIVE BUILD SESSION'); })
+      .then(function() { return delay(500); })
+      .then(function() { return typeComment('Component: Monte Carlo FEEDBACK_LOOP Scenario (v2.0)'); })
+      .then(function() { return delay(500); })
+      .then(function() { return typeComment('Gate target: T+48h \u2014 100% coverage, all 8 scenarios pass'); })
+      .then(function() { return delay(500); })
+      .then(function() { return typeComment('\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550'); })
+      .then(function() { return divider(); });
+  }
+
+  /* ── ACT 2: RESEARCHLOOP ── */
+  function act2() {
+    setStage('2/7 \u2014 RESEARCHLOOP');
+
+    return typePrompt('python -m researchloop --query "Monte Carlo FEEDBACK_LOOP scenario requirements" --models grok,claude,gemini')
+      .then(function() { return delay(500); })
+      .then(function() { return out('<span class="white-bold">[RESEARCHLOOP v3]</span> Initiating multi-source validation...'); })
+      .then(function() { return delay(400); })
+      .then(function() {
+        addLine('<span class="secondary">[09:00:14]</span> Querying <span class="output">Grok</span>    \u2192 physics constraint validation');
+        addLine('<span class="secondary">[09:00:14]</span> Querying <span class="output">Claude</span>   \u2192 architecture alignment check');
+        addLine('<span class="secondary">[09:00:14]</span> Querying <span class="output">Gemini</span>   \u2192 cross-reference verification');
+        return delay(3000);
+      })
+      .then(function() { return out('<span class="secondary">[09:00:18]</span> Grok response    <span class="amber">\u2713</span> Entropy conservation |\u0394S| &lt; 0.01 confirmed', 300); })
+      .then(function() { return out('<span class="secondary">[09:00:19]</span> Claude response  <span class="amber">\u2713</span> FEEDBACK_LOOP must produce \u226525 training examples', 500); })
+      .then(function() { return out('<span class="secondary">[09:00:20]</span> Gemini response  <span class="amber">\u2713</span> correction_rate_decrease \u2265 50% per Monte Carlo v2.0', 500); })
+      .then(function() { return delay(400); })
+      .then(function() { return out(''); })
+      .then(function() { return out('<span class="white-bold">[RESEARCHLOOP]</span> Consensus reached: <span class="amber">3/3 models agree</span> on pass criteria', 300); })
+      .then(function() { return out('<span class="white-bold">[RESEARCHLOOP]</span> Generating build specification...', 300); })
+      .then(function() { return outReceipt('research_receipt sha256:7a8b9c4d...'); })
+      .then(function() { return divider(); });
+  }
+
+  /* ── ACT 3: SPECIFICATION ── */
+  function act3() {
+    setStage('3/7 \u2014 SPECIFICATION');
+
+    return typePrompt('cat build_spec_feedback_loop.md | head -20')
+      .then(function() { return delay(400); })
+      .then(function() { return out('<span class="white-bold"># FEEDBACK_LOOP Scenario \u2014 Build Specification</span>'); })
+      .then(function() { return out('<span class="secondary"># Generated: 2026-02-27T09:01:22Z</span>'); })
+      .then(function() { return out('<span class="secondary"># Source: RESEARCHLOOP v3 consensus (3/3 models)</span>'); })
+      .then(function() { return out(''); })
+      .then(function() { return out('<span class="white-bold">## Pass Criteria</span>'); })
+      .then(function() { return out('  - correction_rate_decrease: <span class="amber">\u2265 50%</span>'); })
+      .then(function() { return out('  - model_improvement_detected: <span class="amber">true</span>'); })
+      .then(function() { return out('  - training_examples_produced: <span class="amber">\u2265 25</span>'); })
+      .then(function() { return out('  - reason_codes_captured: <span class="amber">true</span>'); })
+      .then(function() { return out(''); })
+      .then(function() { return out('<span class="output">## Cycle Count: 500</span>'); })
+      .then(function() { return out('<span class="output">## Constraint Validators: 5 (ConservationValidator active)</span>'); })
+      .then(function() { return out('<span class="output">## Gate Schedule:</span>'); })
+      .then(function() { return out('  - <span class="amber">T+2h</span>:  dual_hash() emits valid receipt, CLI produces JSON'); })
+      .then(function() { return out('  - <span class="amber">T+24h</span>: 80% test coverage, BASELINE scenario passes'); })
+      .then(function() { return out('  - <span class="amber">T+48h</span>: 100% coverage, all 8 scenarios pass'); })
+      .then(function() { return delay(200); })
+      .then(function() { return outReceipt('spec_receipt sha256:3e5f8a2b...'); })
+      .then(function() { return divider(); });
+  }
+
+  /* ── ACT 4: CLAUDE CODE EXECUTION ── */
+  function act4() {
+    setStage('4/7 \u2014 CLAUDE CODE');
+
+    return typePrompt('claude-code build --spec build_spec_feedback_loop.md --standard CLAUDEME')
+      .then(function() { return delay(500); })
+      .then(function() { return out('<span class="white-bold">[CLAUDE CODE]</span> Loading CLAUDEME.md standards...'); })
+      .then(function() { return out('<span class="white-bold">[CLAUDE CODE]</span> Parsing specification: <span class="output">6 requirements, 3 gates</span>', 500); })
+      .then(function() { return delay(800); })
+      .then(function() { return out('<span class="white-bold">[CLAUDE CODE]</span> Creating <span class="blue">src/scenarios/feedback_loop.py</span>'); })
+      .then(function() { return delay(300); })
+      .then(function() { return out('<span class="secondary">  Writing FeedbackLoopScenario class...</span>', 300); })
+      .then(function() { return out('<span class="secondary">  Writing correction_handler()...</span>', 300); })
+      .then(function() { return out('<span class="secondary">  Writing training_data_factory()...</span>', 300); })
+      .then(function() { return out('<span class="secondary">  Writing improvement_detector()...</span>', 300); })
+      .then(function() { return out('<span class="secondary">  Injecting emit_receipt() at every operation boundary...</span>', 300); })
+      .then(function() { return delay(800); })
+      .then(function() { return out(''); })
+      .then(function() { return out('<span class="white-bold">[CLAUDE CODE]</span> Creating <span class="blue">tests/test_feedback_loop.py</span>'); })
+      .then(function() { return delay(400); })
+      .then(function() { return out('  test_correction_rate_decreases............... <span class="amber">\u2713</span>', 400); })
+      .then(function() { return out('  test_training_examples_produced.............. <span class="amber">\u2713</span>', 400); })
+      .then(function() { return out('  test_model_improvement_detected.............. <span class="amber">\u2713</span>', 400); })
+      .then(function() { return out('  test_reason_codes_captured................... <span class="amber">\u2713</span>', 400); })
+      .then(function() { return out('  test_conservation_validator.................. <span class="amber">\u2713</span>', 400); })
+      .then(function() { return out('  test_receipt_emission_complete............... <span class="amber">\u2713</span>', 400); })
+      .then(function() { return delay(500); })
+      .then(function() { return out(''); })
+      .then(function() { return out('  <span class="amber">6 passed</span>, <span class="secondary">0 failed, 0 skipped</span>'); })
+      .then(function() { return delay(800); })
+      .then(function() { return out(''); })
+      .then(function() { return out('<span class="white-bold">[CLAUDE CODE]</span> Computing dual-hash...'); })
+      .then(function() { return out('  SHA256: <span class="amber">a1b2c3d4e5f6...</span>', 300); })
+      .then(function() { return out('  BLAKE3: <span class="amber">9f8e7d6c5b4a...</span>', 300); })
+      .then(function() { return out('  Combined: <span class="amber">a1b2c3d4e5f6:9f8e7d6c5b4a</span>', 300); })
+      .then(function() { return delay(300); })
+      .then(function() { return outReceipt('build_receipt sha256:a1b2c3d4...'); })
+      .then(function() { return divider(); });
+  }
+
+  /* ── ACT 5: T+2h GATE ── */
+  function act5() {
+    setStage('5/7 \u2014 GATE T+2h');
+
+    return typePrompt('python -m gate_check --gate t2h --spec build_spec_feedback_loop.md')
+      .then(function() { return delay(300); })
+      .then(function() { return out('<span class="white-bold">[GATE T+2h]</span> Validating...'); })
+      .then(function() { return delay(1500); })
+      .then(function() { return out('  <span class="amber">\u2713</span> dual_hash() emits valid receipt', 400); })
+      .then(function() { return out('  <span class="amber">\u2713</span> CLI produces JSON output', 400); })
+      .then(function() { return out('  <span class="amber">\u2713</span> Receipt chain integrity: 3 receipts, 0 gaps', 400); })
+      .then(function() { return out('  <span class="amber">\u2713</span> CLAUDEME compliance: all emit_receipt() calls present', 400); })
+      .then(function() { return delay(2000); })
+      .then(function() { return out(''); })
+      .then(function() {
+        addLine(banner('GATE T+2h: PASS', '[3/3 criteria met]'));
+        return delay(1500);
+      })
+      .then(function() {
+        setGates(true, false, false);
+        return outReceipt('gate_receipt sha256:5d6e7f8a...');
+      })
+      .then(function() { return divider(); });
+  }
+
+  /* ── ACT 6: FULL VALIDATION ── */
+  function act6() {
+    setStage('6/7 \u2014 VALIDATION');
+
+    return typePrompt('python -m monte_carlo --all-scenarios --workers 7')
+      .then(function() { return delay(300); })
+      .then(function() { return out('<span class="white-bold">[MONTE CARLO v2.0]</span> Running 8 mandatory scenarios (7 workers)...'); })
+      .then(function() { return delay(2000); })
+      .then(function() { return out(''); })
+      .then(function() { return out('  <span class="output">BASELINE</span>        <span class="secondary">1000 cycles</span>    <span class="amber">\u2713 99.9% completion, 0 violations</span>', 800); })
+      .then(function() { return out('  <span class="output">STRESS</span>           <span class="secondary">500 cycles</span>    <span class="amber">\u2713 97% accuracy at 5x, 4.2GB RAM</span>', 800); })
+      .then(function() { return out('  <span class="output">TOPOLOGY</span>         <span class="secondary">100 cycles</span>    <span class="amber">\u2713 98.7% classification accuracy</span>', 800); })
+      .then(function() { return out('  <span class="output">CASCADE</span>          <span class="secondary">100 cycles</span>    <span class="amber">\u2713 Exact variant count, all backtests pass</span>', 800); })
+      .then(function() { return out('  <span class="output">COMPRESSION</span>      <span class="secondary">200 cycles</span>    <span class="amber">\u2713 +7.2% meta-pattern improvement</span>', 800); })
+      .then(function() { return out('  <span class="output">SINGULARITY</span>     <span class="secondary">2000 cycles</span>    <span class="amber">\u2713 Converged at cycle 847, entropy negative</span>', 800); })
+      .then(function() { return out('  <span class="output">THERMODYNAMIC</span>   <span class="secondary">1000 cycles</span>    <span class="amber">\u2713 |\u0394S| &lt; 0.01 every cycle (max: 0.0089)</span>', 800); })
+      .then(function() { return delay(500); })
+      .then(function() { return out('  <span class="white-bold">FEEDBACK_LOOP</span>    <span class="secondary">500 cycles</span>    <span class="amber">\u2713 Corrections \u2193 62%, model improved</span>', 800); })
+      .then(function() { return delay(500); })
+      .then(function() {
+        setReceipts(8);
+        return delay(2000);
+      })
+      .then(function() { return out(''); })
+      .then(function() {
+        addLine(banner('8/8 SCENARIOS PASSED', 'runtime: 34m 12s'));
+        return delay(600);
+      })
+      .then(function() { return out(''); })
+      .then(function() { return out('  Conservation validated: <span class="amber">|\u0394S| &lt; 0.01</span> across 4400 total cycles', 400); })
+      .then(function() { return out('  Training examples produced: <span class="amber">31</span> (\u226525 required)', 400); })
+      .then(function() { return out('  All 5 constraint validators: <span class="amber">PASS</span>', 400); })
+      .then(function() {
+        setReceipts(10);
+        return delay(2000);
+      })
+      .then(function() { return out(''); })
+      .then(function() { return out('<span class="white-bold">[GATE T+48h]</span> Validating...'); })
+      .then(function() { return delay(1500); })
+      .then(function() { return out('  <span class="amber">\u2713</span> 100% test coverage', 400); })
+      .then(function() { return out('  <span class="amber">\u2713</span> All 8 Monte Carlo scenarios pass', 400); })
+      .then(function() { return out('  <span class="amber">\u2713</span> Receipt chain integrity: 12 receipts, 0 gaps', 400); })
+      .then(function() { return out('  <span class="amber">\u2713</span> Entropy conservation: <span class="amber">PROVEN</span>', 400); })
+      .then(function() { return delay(2000); })
+      .then(function() { return out(''); })
+      .then(function() {
+        addLine(banner('GATE T+48h: PASS', '[4/4 criteria met]'));
+        setGates(true, true, true);
+        return delay(1500);
+      })
+      .then(function() { return outReceipt('gate_receipt sha256:b2c3d4e5...'); })
+      .then(function() { return outReceipt('monte_carlo_receipt sha256:e8f9a0b1...'); })
+      .then(function() {
+        setReceipts(12);
+        return divider();
+      });
+  }
+
+  /* ── ACT 7: SHIP ── */
+  function act7() {
+    setStage('7/7 \u2014 SHIP');
+
+    return typePrompt('git add -A && git commit -m "feat(monte-carlo): FEEDBACK_LOOP scenario v2.0"')
+      .then(function() { return delay(1000); })
+      .then(function() { return out('<span class="output">[main 8f9e2d1] feat(monte-carlo): FEEDBACK_LOOP scenario v2.0</span>'); })
+      .then(function() { return out(' <span class="secondary">3 files changed, 847 insertions(+)</span>', 250); })
+      .then(function() { return out(' <span class="secondary">create mode 100644</span> <span class="blue">src/scenarios/feedback_loop.py</span>', 250); })
+      .then(function() { return out(' <span class="secondary">create mode 100644</span> <span class="blue">tests/test_feedback_loop.py</span>', 250); })
+      .then(function() { return out(' <span class="secondary">create mode 100644</span> <span class="blue">receipts/session_2026-02-27.jsonl</span>', 250); })
+      .then(function() { return delay(800); })
+      .then(function() { return out(''); })
+      .then(function() { return typePrompt('python -m manifest --anchor'); })
+      .then(function() { return delay(500); })
+      .then(function() { return out('<span class="white-bold">[MANIFEST]</span> Generating deployment anchor...'); })
+      .then(function() { return delay(2000); })
+      .then(function() { return out(''); })
+      .then(function() { return out('  Session ID:     <span class="output">2026-02-27-feedback-loop</span>', 400); })
+      .then(function() { return out('  Total Receipts: <span class="amber">14</span>', 400); })
+      .then(function() { return out('  Chain Integrity: <span class="amber">VERIFIED</span> (genesis \u2192 HEAD)', 400); })
+      .then(function() { return out('  Dual-Hash:      <span class="amber">a1b2c3d4:9f8e7d6c</span>', 400); })
+      .then(function() { return out('  Merkle Root:    <span class="amber">sha256:4e5f6a7b8c9d...</span>', 400); })
+      .then(function() { return out('  Gates Passed:   <span class="amber">T+2h \u2713  T+24h \u2713  T+48h \u2713</span>', 400); })
+      .then(function() {
+        setReceipts(14);
+        setStats('14 receipts | 0 gaps | genesis \u2192 HEAD verified');
+        return delay(3000);
+      })
+      .then(function() { return out(''); })
+      .then(function() {
+        addLine(banner('MANIFEST.anchor SEALED', ''));
+        return delay(1500);
+      })
+      .then(function() { return out(''); })
+      .then(function() {
+        return delay(1500).then(function() {
+          addLine('<span class="secondary italic">  "We built this accountably."</span>');
+        });
+      })
+      .then(function() { return delay(800); })
+      .then(function() {
+        return delay(300).then(function() {
+          addLine('<span class="amber">receipt emitted: manifest_receipt sha256:c4d5e6f7...</span>');
+        });
+      })
+      .then(function() {
+        setStage('7/7 \u2014 SHIPPED \u2713');
+        finished = true;
+      });
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     MAIN SEQUENCE
+     ═══════════════════════════════════════════════════════ */
+  function runAll() {
+    finished = false;
+    clearTerminal();
+    setReceipts(0);
+    setGates(false, false, false);
+    setStage('\u2014');
+    setStats('\u2014');
+
+    return act1()
+      .then(act2)
+      .then(act3)
+      .then(act4)
+      .then(act5)
+      .then(act6)
+      .then(act7);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     JUMP-TO FUNCTIONS
+     ═══════════════════════════════════════════════════════ */
+  function jumpToAct5() {
+    finished = false;
+    clearTerminal();
+    setStage('5/7 \u2014 GATE T+2h');
+    setReceipts(3);
+    setGates(false, false, false);
+    setStats('Session start: 2026-02-27T09:00:00Z');
+
+    addLine('<span class="muted">[... previous acts omitted ...]</span>');
+    addLine('');
+
+    return act5().then(act6).then(act7);
+  }
+
+  function jumpToFinal() {
+    finished = true;
+    clearTerminal();
+    setStage('7/7 \u2014 SHIPPED \u2713');
+    setReceipts(14);
+    setGates(true, true, true);
+    setStats('14 receipts | 0 gaps | genesis \u2192 HEAD verified');
+
+    addLine('<span class="white-bold">[MANIFEST]</span> Generating deployment anchor...');
+    addLine('');
+    addLine('  Session ID:     <span class="output">2026-02-27-feedback-loop</span>');
+    addLine('  Total Receipts: <span class="amber">14</span>');
+    addLine('  Chain Integrity: <span class="amber">VERIFIED</span> (genesis \u2192 HEAD)');
+    addLine('  Dual-Hash:      <span class="amber">a1b2c3d4:9f8e7d6c</span>');
+    addLine('  Merkle Root:    <span class="amber">sha256:4e5f6a7b8c9d...</span>');
+    addLine('  Gates Passed:   <span class="amber">T+2h \u2713  T+24h \u2713  T+48h \u2713</span>');
+    addLine('');
+    addLine(banner('MANIFEST.anchor SEALED', ''));
+    addLine('');
+    addLine('<span class="secondary italic">  "We built this accountably."</span>');
+    addLine('');
+    addLine('<span class="amber">receipt emitted: manifest_receipt sha256:c4d5e6f7...</span>');
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     KEYBOARD CONTROLS
+     ═══════════════════════════════════════════════════════ */
+  document.addEventListener('keydown', function(e) {
+    var key = e.key.toLowerCase();
+
+    if (key === ' ') {
+      e.preventDefault();
+      paused = !paused;
+    }
+    else if (key === 'r') {
+      paused = false;
+      runAll();
+    }
+    else if (key === 'j') {
+      paused = false;
+      jumpToAct5();
+    }
+    else if (key === 'f') {
+      paused = false;
+      jumpToFinal();
+    }
+  });
+
+  /* ═══════════════════════════════════════════════════════
+     START
+     ═══════════════════════════════════════════════════════ */
+  runAll();
+
+})();
+</script>
+</body>
+</html>
