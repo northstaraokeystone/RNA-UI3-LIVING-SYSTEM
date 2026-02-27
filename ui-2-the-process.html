@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440,initial-scale=1">
+<title>UI-2 — The Process</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0A0A0A;
+  --surface:#141414;
+  --prompt-green:#4ADE80;
+  --text-primary:#E2E8F0;
+  --text-secondary:#94A3B8;
+  --text-muted:#64748B;
+  --accent-amber:#F59E0B;
+  --accent-blue:#3B82F6;
+  --accent-red:#DC2626;
+  --white:#FFFFFF;
+  --border:#1E293B;
+  --font-mono:Consolas,'Courier New',monospace;
+  --font-serif:Georgia,Cambria,serif;
+  --font-sans:Calibri,'Segoe UI',system-ui,sans-serif;
+}
+html,body{
+  height:100%;width:100%;
+  background:var(--bg);color:var(--text-primary);
+  font-family:var(--font-mono);font-size:16px;
+  overflow:hidden;
+}
+::selection{background:rgba(59,130,246,0.25);color:inherit}
+#app{
+  max-width:1440px;margin:0 auto;height:100vh;
+  display:flex;flex-direction:column;
+  padding:16px 24px 0 24px;
+}
+
+/* ── Terminal ── */
+#terminal{
+  flex:1 1 0;min-height:0;
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-bottom:none;
+  overflow:hidden;position:relative;
+  display:flex;flex-direction:column;
+}
+#terminal-title{
+  height:36px;display:flex;align-items:center;
+  padding:0 16px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  font-family:var(--font-sans);font-size:12px;
+  color:var(--text-muted);letter-spacing:0.5px;
+  user-select:none;
+}
+#terminal-title .dots{display:flex;gap:6px;margin-right:12px}
+#terminal-title .dot{width:10px;height:10px;border-radius:50%;background:var(--border)}
+#terminal-body{
+  flex:1 1 0;min-height:0;
+  overflow-y:auto;overflow-x:hidden;
+  padding:12px 24px 12px 24px;
+  line-height:1.5;
+  font-size:16px;
+  scroll-behavior:auto;
+}
+#terminal-body::-webkit-scrollbar{width:4px}
+#terminal-body::-webkit-scrollbar-track{background:transparent}
+#terminal-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+.line{white-space:pre-wrap;word-break:break-all;min-height:1.5em}
+.line-prompt{color:var(--prompt-green);font-weight:700}
+.line-output{color:var(--text-primary)}
+.line-secondary{color:var(--text-secondary)}
+.line-muted{color:var(--text-muted)}
+.line-amber{color:var(--accent-amber)}
+.line-amber-bold{color:var(--accent-amber);font-weight:700}
+.line-blue{color:var(--accent-blue)}
+.line-white{color:var(--white);font-weight:700}
+.line-divider{color:var(--text-muted)}
+
+/* Cursor */
+#cursor{
+  display:inline-block;width:8px;height:1.1em;
+  background:var(--text-primary);vertical-align:text-bottom;
+  opacity:0.7;
+}
+
+/* ── Info strip ── */
+#info-strip{
+  display:flex;
+  background:var(--surface);
+  border:1px solid var(--border);
+  flex-shrink:0;
+}
+.info-cell{
+  padding:14px 18px;
+  display:flex;flex-direction:column;justify-content:center;
+}
+.info-cell+.info-cell{border-left:1px solid var(--border)}
+.info-cell:nth-child(1){width:25%}
+.info-cell:nth-child(2){width:30%}
+.info-cell:nth-child(3){width:20%}
+.info-cell:nth-child(4){width:25%}
+.info-label{
+  font-family:var(--font-sans);font-size:10px;
+  color:var(--text-muted);letter-spacing:1.5px;
+  text-transform:uppercase;margin-bottom:6px;
+}
+.info-value{
+  font-family:var(--font-mono);font-size:16px;
+  color:var(--text-primary);
+}
+.info-value-lg{
+  font-family:var(--font-mono);font-size:26px;
+  color:var(--accent-amber);font-weight:700;
+}
+.info-value-sm{
+  font-family:var(--font-mono);font-size:13px;
+  color:var(--text-secondary);
+}
+.gate-pass{color:var(--accent-amber)}
+.gate-pending{color:var(--text-muted)}
+
+/* ── Bottom pad ── */
+#bottom-pad{height:16px;flex-shrink:0}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="terminal">
+    <div id="terminal-title">
+      <span class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>
+      RECEIPTS-NATIVE BUILD SESSION
+    </div>
+    <div id="terminal-body"></div>
+  </div>
+  <div id="info-strip">
+    <div class="info-cell">
+      <div class="info-label">Build Stage</div>
+      <div class="info-value" id="info-stage">—</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Gates</div>
+      <div class="info-value" id="info-gates">
+        <span class="gate-pending">T+2h ░░</span>&nbsp;&nbsp;
+        <span class="gate-pending">T+24h ░░</span>&nbsp;&nbsp;
+        <span class="gate-pending">T+48h ░░</span>
+      </div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Receipts</div>
+      <div class="info-value-lg" id="info-receipts">0</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Session</div>
+      <div class="info-value-sm" id="info-stats">Session start: 2026-02-27T09:00:00Z</div>
+    </div>
+  </div>
+  <div id="bottom-pad"></div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ── DOM refs ── */
+var body = document.getElementById('terminal-body');
+var infoStage = document.getElementById('info-stage');
+var infoGates = document.getElementById('info-gates');
+var infoReceipts = document.getElementById('info-receipts');
+var infoStats = document.getElementById('info-stats');
+
+/* ── State ── */
+var receiptCount = 0;
+var paused = false;
+var abortFlag = false;
+var runningId = 0;
+
+/* ── Helpers ── */
+function scrollToBottom(){
+  body.scrollTop = body.scrollHeight;
+}
+
+function addLine(text, cls){
+  var el = document.createElement('div');
+  el.className = 'line ' + (cls || 'line-output');
+  el.textContent = text;
+  body.appendChild(el);
+  scrollToBottom();
+}
+
+function addRichLine(spans){
+  var el = document.createElement('div');
+  el.className = 'line';
+  for(var i=0;i<spans.length;i++){
+    var s = document.createElement('span');
+    s.className = spans[i][1] || '';
+    s.textContent = spans[i][0];
+    el.appendChild(s);
+  }
+  body.appendChild(el);
+  scrollToBottom();
+}
+
+function sleep(ms){
+  var id = runningId;
+  return new Promise(function(resolve){
+    function check(){
+      if(abortFlag) return resolve();
+      if(!paused){ resolve(); return; }
+      setTimeout(check, 50);
+    }
+    setTimeout(function(){check()}, ms);
+  });
+}
+
+function typePrompt(text){
+  return new Promise(function(resolve){
+    var el = document.createElement('div');
+    el.className = 'line line-prompt';
+    body.appendChild(el);
+    var idx = 0;
+    var full = '$ ' + text;
+    function step(){
+      if(abortFlag){el.textContent=full;scrollToBottom();resolve();return}
+      if(paused){setTimeout(step,50);return}
+      if(idx <= full.length){
+        el.textContent = full.substring(0, idx);
+        if(idx < full.length){
+          var cur = document.getElementById('cursor');
+          if(!cur){cur = document.createElement('span');cur.id='cursor';cur.textContent=' ';}
+          el.appendChild(cur);
+        } else {
+          var cur = document.getElementById('cursor');
+          if(cur && cur.parentNode) cur.parentNode.removeChild(cur);
+        }
+        scrollToBottom();
+        idx++;
+        setTimeout(step, 40);
+      } else {
+        resolve();
+      }
+    }
+    step();
+  });
+}
+
+function removeCursor(){
+  var c = document.getElementById('cursor');
+  if(c && c.parentNode) c.parentNode.removeChild(c);
+}
+
+function setStage(text){ infoStage.textContent = text; }
+
+function setGates(g1, g2, g3){
+  var h = '';
+  if(g1) h += '<span class="gate-pass">T+2h \u2588\u2588 PASS</span>';
+  else   h += '<span class="gate-pending">T+2h \u2591\u2591</span>';
+  h += '&nbsp;&nbsp;';
+  if(g2) h += '<span class="gate-pass">T+24h \u2588\u2588 PASS</span>';
+  else   h += '<span class="gate-pending">T+24h \u2591\u2591</span>';
+  h += '&nbsp;&nbsp;';
+  if(g3) h += '<span class="gate-pass">T+48h \u2588\u2588 PASS</span>';
+  else   h += '<span class="gate-pending">T+48h \u2591\u2591</span>';
+  infoGates.innerHTML = h;
+}
+
+function bumpReceipts(n){
+  receiptCount += (n||1);
+  infoReceipts.textContent = receiptCount;
+}
+
+function setStats(text){ infoStats.textContent = text; }
+
+function addReceipt(text){
+  addLine(text, 'line-amber');
+  bumpReceipts(1);
+}
+
+function addDivider(){
+  return sleep(500).then(function(){
+    addLine('───────────────────────────────────────────────────────', 'line-divider');
+    return sleep(2000);
+  });
+}
+
+/* ── ACT 1: THE IDEA ── */
+function act1(){
+  setStage('1/7 \u2014 IDEA');
+  setGates(false,false,false);
+  receiptCount = 0;
+  infoReceipts.textContent = '0';
+  setStats('Session start: 2026-02-27T09:00:00Z');
+
+  return typePrompt('# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550')
+  .then(function(){ return sleep(500) })
+  .then(function(){ return typePrompt('# RECEIPTS-NATIVE BUILD SESSION') })
+  .then(function(){ return sleep(500) })
+  .then(function(){ return typePrompt('# Component: Monte Carlo FEEDBACK_LOOP Scenario (v2.0)') })
+  .then(function(){ return sleep(500) })
+  .then(function(){ return typePrompt('# Gate target: T+48h \u2014 100% coverage, all 8 scenarios pass') })
+  .then(function(){ return sleep(500) })
+  .then(function(){ return typePrompt('# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550') })
+  .then(function(){ removeCursor(); return addDivider() });
+}
+
+/* ── ACT 2: RESEARCHLOOP ── */
+function act2(){
+  setStage('2/7 \u2014 RESEARCHLOOP');
+
+  return typePrompt('python -m researchloop --query "Monte Carlo FEEDBACK_LOOP scenario requirements" --models grok,claude,gemini')
+  .then(function(){ removeCursor(); return sleep(500) })
+  .then(function(){ addLine('[RESEARCHLOOP v3] Initiating multi-source validation...', 'line-output'); return sleep(300) })
+  .then(function(){
+    addLine('[09:00:14] Querying Grok    \u2192 physics constraint validation', 'line-secondary');
+    addLine('[09:00:14] Querying Claude   \u2192 architecture alignment check', 'line-secondary');
+    addLine('[09:00:14] Querying Gemini   \u2192 cross-reference verification', 'line-secondary');
+    scrollToBottom();
+    return sleep(3000);
+  })
+  .then(function(){ addRichLine([['[09:00:18] Grok response    ',  'line-secondary'], ['\u2713 Entropy conservation |\u0394S| < 0.01 confirmed', 'line-amber']]); return sleep(500) })
+  .then(function(){ addRichLine([['[09:00:19] Claude response  ', 'line-secondary'], ['\u2713 FEEDBACK_LOOP must produce \u226525 training examples', 'line-amber']]); return sleep(500) })
+  .then(function(){ addRichLine([['[09:00:20] Gemini response  ', 'line-secondary'], ['\u2713 correction_rate_decrease \u2265 50% per Monte Carlo v2.0', 'line-amber']]); return sleep(500) })
+  .then(function(){ addLine(''); return sleep(300) })
+  .then(function(){ addLine('[RESEARCHLOOP] Consensus reached: 3/3 models agree on pass criteria', 'line-output'); return sleep(300) })
+  .then(function(){ addLine('[RESEARCHLOOP] Generating build specification...', 'line-output'); return sleep(300) })
+  .then(function(){ addReceipt('[RESEARCHLOOP] receipt emitted: research_receipt sha256:7a8b9c4d...'); return addDivider() });
+}
+
+/* ── ACT 3: SPECIFICATION ── */
+function act3(){
+  setStage('3/7 \u2014 SPECIFICATION');
+
+  return typePrompt('cat build_spec_feedback_loop.md | head -20')
+  .then(function(){ removeCursor(); return sleep(500) })
+  .then(function(){ addLine('# FEEDBACK_LOOP Scenario \u2014 Build Specification', 'line-white'); return sleep(200) })
+  .then(function(){ addLine('# Generated: 2026-02-27T09:01:22Z', 'line-secondary'); return sleep(200) })
+  .then(function(){ addLine('# Source: RESEARCHLOOP v3 consensus (3/3 models)', 'line-secondary'); return sleep(200) })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addLine('## Pass Criteria', 'line-white'); return sleep(200) })
+  .then(function(){ addLine('  - correction_rate_decrease: \u2265 50%', 'line-output'); return sleep(200) })
+  .then(function(){ addLine('  - model_improvement_detected: true', 'line-output'); return sleep(200) })
+  .then(function(){ addLine('  - training_examples_produced: \u2265 25', 'line-output'); return sleep(200) })
+  .then(function(){ addLine('  - reason_codes_captured: true', 'line-output'); return sleep(200) })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addLine('## Cycle Count: 500', 'line-white'); return sleep(200) })
+  .then(function(){ addLine('## Constraint Validators: 5 (ConservationValidator active)', 'line-white'); return sleep(200) })
+  .then(function(){ addLine('## Gate Schedule:', 'line-white'); return sleep(200) })
+  .then(function(){ addRichLine([['  - ', 'line-output'], ['T+2h', 'line-amber'], [':  dual_hash() emits valid receipt, CLI produces JSON', 'line-output']]); return sleep(200) })
+  .then(function(){ addRichLine([['  - ', 'line-output'], ['T+24h', 'line-amber'], [': 80% test coverage, BASELINE scenario passes', 'line-output']]); return sleep(200) })
+  .then(function(){ addRichLine([['  - ', 'line-output'], ['T+48h', 'line-amber'], [': 100% coverage, all 8 scenarios pass', 'line-output']]); return sleep(200) })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addReceipt('receipt emitted: spec_receipt sha256:3e5f8a2b...'); return addDivider() });
+}
+
+/* ── ACT 4: CLAUDE CODE EXECUTION ── */
+function act4(){
+  setStage('4/7 \u2014 CLAUDE CODE');
+
+  return typePrompt('claude-code build --spec build_spec_feedback_loop.md --standard CLAUDEME')
+  .then(function(){ removeCursor(); return sleep(500) })
+  .then(function(){ addLine('[CLAUDE CODE] Loading CLAUDEME.md standards...', 'line-output'); return sleep(500) })
+  .then(function(){ addLine('[CLAUDE CODE] Parsing specification: 6 requirements, 3 gates', 'line-output'); return sleep(800) })
+  .then(function(){ addRichLine([['[CLAUDE CODE] Creating ', 'line-output'], ['src/scenarios/feedback_loop.py', 'line-blue']]); return sleep(800) })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addLine('  Writing FeedbackLoopScenario class...', 'line-secondary'); return sleep(300) })
+  .then(function(){ addLine('  Writing correction_handler()...', 'line-secondary'); return sleep(300) })
+  .then(function(){ addLine('  Writing training_data_factory()...', 'line-secondary'); return sleep(300) })
+  .then(function(){ addLine('  Writing improvement_detector()...', 'line-secondary'); return sleep(300) })
+  .then(function(){ addLine('  Injecting emit_receipt() at every operation boundary...', 'line-secondary'); return sleep(800) })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addRichLine([['[CLAUDE CODE] Creating ', 'line-output'], ['tests/test_feedback_loop.py', 'line-blue']]); return sleep(800) })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addRichLine([['  test_correction_rate_decreases............... ', 'line-output'], ['\u2713', 'line-amber']]); return sleep(400) })
+  .then(function(){ addRichLine([['  test_training_examples_produced.............. ', 'line-output'], ['\u2713', 'line-amber']]); return sleep(400) })
+  .then(function(){ addRichLine([['  test_model_improvement_detected.............. ', 'line-output'], ['\u2713', 'line-amber']]); return sleep(400) })
+  .then(function(){ addRichLine([['  test_reason_codes_captured................... ', 'line-output'], ['\u2713', 'line-amber']]); return sleep(400) })
+  .then(function(){ addRichLine([['  test_conservation_validator.................. ', 'line-output'], ['\u2713', 'line-amber']]); return sleep(400) })
+  .then(function(){ addRichLine([['  test_receipt_emission_complete............... ', 'line-output'], ['\u2713', 'line-amber']]); return sleep(500) })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addRichLine([['  6 passed', 'line-amber'], [', 0 failed, 0 skipped', 'line-secondary']]); return sleep(800) })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addLine('[CLAUDE CODE] Computing dual-hash...', 'line-output'); return sleep(300) })
+  .then(function(){ addLine('  SHA256: a1b2c3d4e5f6...', 'line-amber'); return sleep(300) })
+  .then(function(){ addLine('  BLAKE3: 9f8e7d6c5b4a...', 'line-amber'); return sleep(300) })
+  .then(function(){ addLine('  Combined: a1b2c3d4e5f6:9f8e7d6c5b4a', 'line-amber'); return sleep(500) })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addReceipt('receipt emitted: build_receipt sha256:a1b2c3d4...'); return addDivider() });
+}
+
+/* ── ACT 5: T+2h GATE ── */
+function act5(){
+  setStage('5/7 \u2014 GATE T+2h');
+
+  return typePrompt('python -m gate_check --gate t2h --spec build_spec_feedback_loop.md')
+  .then(function(){ removeCursor(); return sleep(500) })
+  .then(function(){ addLine('[GATE T+2h] Validating...', 'line-output'); return sleep(1500) })
+  .then(function(){ addRichLine([['  \u2713 ', 'line-amber'], ['dual_hash() emits valid receipt', 'line-output']]); return sleep(400) })
+  .then(function(){ addRichLine([['  \u2713 ', 'line-amber'], ['CLI produces JSON output', 'line-output']]); return sleep(400) })
+  .then(function(){ addRichLine([['  \u2713 ', 'line-amber'], ['Receipt chain integrity: 3 receipts, 0 gaps', 'line-output']]); return sleep(400) })
+  .then(function(){ addRichLine([['  \u2713 ', 'line-amber'], ['CLAUDEME compliance: all emit_receipt() calls present', 'line-output']]); return sleep(2000) })
+  .then(function(){
+    addLine('');
+    addLine('  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550', 'line-amber');
+    addRichLine([['  GATE T+2h: ', 'line-amber-bold'], ['PASS', 'line-amber-bold'], ['                    [3/3 criteria met]', 'line-amber']]);
+    addLine('  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550', 'line-amber');
+    scrollToBottom();
+    setGates(true, false, false);
+    return sleep(1500);
+  })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addReceipt('receipt emitted: gate_receipt sha256:5d6e7f8a...'); return addDivider() });
+}
+
+/* ── ACT 6: FULL VALIDATION ── */
+function act6(){
+  setStage('6/7 \u2014 VALIDATION');
+
+  return typePrompt('python -m monte_carlo --all-scenarios --workers 7')
+  .then(function(){ removeCursor(); return sleep(500) })
+  .then(function(){ addLine('[MONTE CARLO v2.0] Running 8 mandatory scenarios (7 workers)...', 'line-output'); return sleep(2000) })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addRichLine([['  BASELINE        ', 'line-output'], ['1000 cycles    ', 'line-secondary'], ['\u2713 99.9% completion, 0 violations', 'line-amber']]); bumpReceipts(1); return sleep(800) })
+  .then(function(){ addRichLine([['  STRESS           ', 'line-output'], ['500 cycles    ', 'line-secondary'], ['\u2713 97% accuracy at 5x, 4.2GB RAM', 'line-amber']]); bumpReceipts(1); return sleep(800) })
+  .then(function(){ addRichLine([['  TOPOLOGY         ', 'line-output'], ['100 cycles    ', 'line-secondary'], ['\u2713 98.7% classification accuracy', 'line-amber']]); bumpReceipts(1); return sleep(800) })
+  .then(function(){ addRichLine([['  CASCADE          ', 'line-output'], ['100 cycles    ', 'line-secondary'], ['\u2713 Exact variant count, all backtests pass', 'line-amber']]); bumpReceipts(1); return sleep(800) })
+  .then(function(){ addRichLine([['  COMPRESSION      ', 'line-output'], ['200 cycles    ', 'line-secondary'], ['\u2713 +7.2% meta-pattern improvement', 'line-amber']]); bumpReceipts(1); return sleep(800) })
+  .then(function(){ addRichLine([['  SINGULARITY     ', 'line-output'], ['2000 cycles    ', 'line-secondary'], ['\u2713 Converged at cycle 847, entropy negative', 'line-amber']]); bumpReceipts(1); return sleep(800) })
+  .then(function(){ addRichLine([['  THERMODYNAMIC   ', 'line-output'], ['1000 cycles    ', 'line-secondary'], ['\u2713 |\u0394S| < 0.01 every cycle (max: 0.0089)', 'line-amber']]); bumpReceipts(1); return sleep(1300) })
+  .then(function(){ addRichLine([['  FEEDBACK_LOOP    ', 'line-output'], ['500 cycles    ', 'line-secondary'], ['\u2713 Corrections \u2193 62%, model improved', 'line-amber']]); bumpReceipts(1); return sleep(2000) })
+  .then(function(){
+    addLine('');
+    addLine('  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550', 'line-amber');
+    addRichLine([['  8/8 SCENARIOS PASSED', 'line-amber-bold'], ['              runtime: 34m 12s', 'line-secondary']]);
+    addLine('  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550', 'line-amber');
+    scrollToBottom();
+    return sleep(500);
+  })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addLine('  Conservation validated: |\u0394S| < 0.01 across 4400 total cycles', 'line-output'); return sleep(400) })
+  .then(function(){ addLine('  Training examples produced: 31 (\u226525 required)', 'line-output'); return sleep(400) })
+  .then(function(){ addLine('  All 5 constraint validators: PASS', 'line-amber'); return sleep(2000) })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addLine('[GATE T+48h] Validating...', 'line-output'); return sleep(1500) })
+  .then(function(){ addRichLine([['  \u2713 ', 'line-amber'], ['100% test coverage', 'line-output']]); return sleep(400) })
+  .then(function(){ addRichLine([['  \u2713 ', 'line-amber'], ['All 8 Monte Carlo scenarios pass', 'line-output']]); return sleep(400) })
+  .then(function(){ addRichLine([['  \u2713 ', 'line-amber'], ['Receipt chain integrity: 12 receipts, 0 gaps', 'line-output']]); return sleep(400) })
+  .then(function(){ addRichLine([['  \u2713 ', 'line-amber'], ['Entropy conservation: PROVEN', 'line-output']]); return sleep(2000) })
+  .then(function(){
+    addLine('');
+    addLine('  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550', 'line-amber');
+    addRichLine([['  GATE T+48h: ', 'line-amber-bold'], ['PASS', 'line-amber-bold'], ['                   [4/4 criteria met]', 'line-amber']]);
+    addLine('  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550', 'line-amber');
+    scrollToBottom();
+    setGates(true, true, true);
+    return sleep(1500);
+  })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addReceipt('receipt emitted: gate_receipt sha256:b2c3d4e5...'); return sleep(200) })
+  .then(function(){ addReceipt('receipt emitted: monte_carlo_receipt sha256:e8f9a0b1...'); return addDivider() });
+}
+
+/* ── ACT 7: SHIP ── */
+function act7(){
+  setStage('7/7 \u2014 SHIPPED \u2713');
+  setStats('14 receipts | 0 gaps | genesis \u2192 HEAD verified');
+
+  return typePrompt('git add -A && git commit -m "feat(monte-carlo): FEEDBACK_LOOP scenario v2.0\n\nReceipt: monte_carlo_receipt\nSLO: all_scenarios_pass 100%, entropy_conservation 100%\nGate: t48h PASS\nChain: 14 receipts, 0 gaps, genesis \u2192 HEAD verified"')
+  .then(function(){ removeCursor(); return sleep(1000) })
+  .then(function(){ addRichLine([['[main ', 'line-output'], ['8f9e2d1', 'line-amber'], ['] feat(monte-carlo): FEEDBACK_LOOP scenario v2.0', 'line-output']]); return sleep(200) })
+  .then(function(){ addLine(' 3 files changed, 847 insertions(+)', 'line-output'); return sleep(200) })
+  .then(function(){ addRichLine([['  create mode 100644 ', 'line-output'], ['src/scenarios/feedback_loop.py', 'line-blue']]); return sleep(200) })
+  .then(function(){ addRichLine([['  create mode 100644 ', 'line-output'], ['tests/test_feedback_loop.py', 'line-blue']]); return sleep(200) })
+  .then(function(){ addRichLine([['  create mode 100644 ', 'line-output'], ['receipts/session_2026-02-27.jsonl', 'line-blue']]); return sleep(800) })
+  .then(function(){ addLine(''); return sleep(500) })
+  .then(function(){ return typePrompt('python -m manifest --anchor') })
+  .then(function(){ removeCursor(); return sleep(500) })
+  .then(function(){ addLine('[MANIFEST] Generating deployment anchor...', 'line-output'); return sleep(2000) })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addRichLine([['  Session ID:     ', 'line-secondary'], ['2026-02-27-feedback-loop', 'line-output']]); return sleep(400) })
+  .then(function(){ addRichLine([['  Total Receipts: ', 'line-secondary'], ['14', 'line-amber']]); return sleep(400) })
+  .then(function(){ addRichLine([['  Chain Integrity: ', 'line-secondary'], ['VERIFIED', 'line-amber'], [' (genesis \u2192 HEAD)', 'line-output']]); return sleep(400) })
+  .then(function(){ addRichLine([['  Dual-Hash:      ', 'line-secondary'], ['a1b2c3d4:9f8e7d6c', 'line-amber']]); return sleep(400) })
+  .then(function(){ addRichLine([['  Merkle Root:    ', 'line-secondary'], ['sha256:4e5f6a7b8c9d...', 'line-amber']]); return sleep(400) })
+  .then(function(){ addRichLine([['  Gates Passed:   ', 'line-secondary'], ['T+2h \u2713  T+24h \u2713  T+48h \u2713', 'line-amber']]); return sleep(3000) })
+  .then(function(){
+    addLine('');
+    addLine('  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550', 'line-amber');
+    addRichLine([['  MANIFEST.anchor SEALED', 'line-amber-bold']]);
+    addLine('  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550', 'line-amber');
+    scrollToBottom();
+    return sleep(1500);
+  })
+  .then(function(){
+    var el = document.createElement('div');
+    el.className = 'line';
+    el.style.fontFamily = 'Georgia, Cambria, serif';
+    el.style.fontStyle = 'italic';
+    el.style.color = 'var(--text-secondary)';
+    el.style.marginTop = '4px';
+    el.textContent = '  "We built this accountably."';
+    body.appendChild(el);
+    scrollToBottom();
+    return sleep(500);
+  })
+  .then(function(){ addLine(''); return sleep(200) })
+  .then(function(){ addLine('receipt emitted: manifest_receipt sha256:c4d5e6f7...', 'line-amber') });
+}
+
+
+/* ── FULL RUN ── */
+function runAll(){
+  abortFlag = false;
+  return act1()
+    .then(function(){ if(abortFlag) return; return act2() })
+    .then(function(){ if(abortFlag) return; return act3() })
+    .then(function(){ if(abortFlag) return; return act4() })
+    .then(function(){ if(abortFlag) return; return act5() })
+    .then(function(){ if(abortFlag) return; return act6() })
+    .then(function(){ if(abortFlag) return; return act7() });
+}
+
+function reset(){
+  abortFlag = true;
+  runningId++;
+  body.innerHTML = '';
+  receiptCount = 0;
+  paused = false;
+  infoReceipts.textContent = '0';
+  setStage('\u2014');
+  setGates(false,false,false);
+  setStats('Session start: 2026-02-27T09:00:00Z');
+}
+
+/* ── Jump to Act 5 (pre-filled) ── */
+function jumpToAct5(){
+  reset();
+  setTimeout(function(){
+    /* Fill prior output quickly */
+    receiptCount = 3;
+    infoReceipts.textContent = '3';
+    setStage('5/7 \u2014 GATE T+2h');
+    setGates(false, false, false);
+
+    addLine('$ # \u2550\u2550\u2550 RECEIPTS-NATIVE BUILD SESSION \u2550\u2550\u2550', 'line-prompt');
+    addLine('  [...Acts 1-4 complete — 3 receipts emitted...]', 'line-muted');
+    addLine('───────────────────────────────────────────────────────', 'line-divider');
+
+    act5()
+      .then(function(){ return act6() })
+      .then(function(){ return act7() });
+  }, 100);
+}
+
+/* ── Jump to final state ── */
+function jumpToFinal(){
+  reset();
+  setTimeout(function(){
+    receiptCount = 14;
+    infoReceipts.textContent = '14';
+    setStage('7/7 \u2014 SHIPPED \u2713');
+    setGates(true, true, true);
+    setStats('14 receipts | 0 gaps | genesis \u2192 HEAD verified');
+
+    addLine('  [...Full build session complete...]', 'line-muted');
+    addLine('', 'line-output');
+    addLine('[MANIFEST] Generating deployment anchor...', 'line-output');
+    addLine('', 'line-output');
+    addRichLine([['  Session ID:     ', 'line-secondary'], ['2026-02-27-feedback-loop', 'line-output']]);
+    addRichLine([['  Total Receipts: ', 'line-secondary'], ['14', 'line-amber']]);
+    addRichLine([['  Chain Integrity: ', 'line-secondary'], ['VERIFIED', 'line-amber'], [' (genesis \u2192 HEAD)', 'line-output']]);
+    addRichLine([['  Dual-Hash:      ', 'line-secondary'], ['a1b2c3d4:9f8e7d6c', 'line-amber']]);
+    addRichLine([['  Merkle Root:    ', 'line-secondary'], ['sha256:4e5f6a7b8c9d...', 'line-amber']]);
+    addRichLine([['  Gates Passed:   ', 'line-secondary'], ['T+2h \u2713  T+24h \u2713  T+48h \u2713', 'line-amber']]);
+    addLine('', 'line-output');
+    addLine('  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550', 'line-amber');
+    addRichLine([['  MANIFEST.anchor SEALED', 'line-amber-bold']]);
+    addLine('  \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550', 'line-amber');
+    addLine('', 'line-output');
+
+    var el = document.createElement('div');
+    el.className = 'line';
+    el.style.fontFamily = 'Georgia, Cambria, serif';
+    el.style.fontStyle = 'italic';
+    el.style.color = 'var(--text-secondary)';
+    el.style.marginTop = '4px';
+    el.textContent = '  "We built this accountably."';
+    body.appendChild(el);
+    addLine('', 'line-output');
+    addLine('receipt emitted: manifest_receipt sha256:c4d5e6f7...', 'line-amber');
+    scrollToBottom();
+  }, 100);
+}
+
+/* ── Keyboard controls ── */
+document.addEventListener('keydown', function(e){
+  if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+  if(e.code === 'Space'){
+    e.preventDefault();
+    paused = !paused;
+  }
+  if(e.key === 'r' || e.key === 'R'){
+    e.preventDefault();
+    reset();
+    setTimeout(runAll, 200);
+  }
+  if(e.key === 'j' || e.key === 'J'){
+    e.preventDefault();
+    jumpToAct5();
+  }
+  if(e.key === 'f' || e.key === 'F'){
+    e.preventDefault();
+    jumpToFinal();
+  }
+});
+
+/* ── Auto-start ── */
+runAll();
+
+})();
+</script>
+</body>
+</html>
