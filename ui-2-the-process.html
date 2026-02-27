@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UI-2: The Process — Receipts-Native Build Session</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0A0A0A;
+    --surface: #141414;
+    --prompt-green: #4ADE80;
+    --text-primary: #E2E8F0;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
+    --accent-amber: #F59E0B;
+    --accent-blue: #3B82F6;
+    --accent-red: #DC2626;
+    --white: #FFFFFF;
+    --border: #1E293B;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 16px;
+    line-height: 1.5;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #container {
+    max-width: 1440px;
+    margin: 0 auto;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Terminal Window ── */
+  #terminal {
+    flex: 1;
+    background: var(--bg);
+    overflow: hidden;
+    padding: 16px 24px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+
+  #terminal-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .line {
+    white-space: pre-wrap;
+    word-break: break-all;
+    min-height: 1.5em;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .line .prompt {
+    color: var(--prompt-green);
+    font-weight: bold;
+  }
+
+  .line .cmd {
+    color: var(--prompt-green);
+    font-weight: bold;
+  }
+
+  .line .output { color: var(--text-primary); }
+  .line .secondary { color: var(--text-secondary); }
+  .line .muted { color: var(--text-muted); }
+  .line .amber { color: var(--accent-amber); }
+  .line .amber-bold { color: var(--accent-amber); font-weight: bold; }
+  .line .blue { color: var(--accent-blue); }
+  .line .white-bold { color: var(--white); font-weight: bold; }
+  .line .italic-secondary {
+    color: var(--text-secondary);
+    font-family: Georgia, Cambria, serif;
+    font-style: italic;
+  }
+
+  .divider {
+    color: var(--text-muted);
+  }
+
+  /* ── Info Strip ── */
+  #info-strip {
+    background: var(--surface);
+    display: flex;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    min-height: 64px;
+  }
+
+  .info-cell {
+    flex: 1;
+    padding: 12px 20px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .info-cell:last-child { border-right: none; }
+
+  .info-label {
+    font-family: Calibri, "Segoe UI", sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .info-value {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 14px;
+    color: var(--text-primary);
+    font-weight: bold;
+  }
+
+  .info-value .amber { color: var(--accent-amber); }
+  .info-value .pass { color: var(--accent-amber); font-weight: bold; }
+  .info-value .pending { color: var(--text-muted); }
+</style>
+</head>
+<body>
+<div id="container">
+  <div id="terminal">
+    <div id="terminal-lines"></div>
+  </div>
+  <div id="info-strip">
+    <div class="info-cell">
+      <div class="info-label">Build Stage</div>
+      <div class="info-value" id="info-stage">—</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Gate Status</div>
+      <div class="info-value" id="info-gates">
+        <span class="pending">T+2h ░░</span>  <span class="pending">T+24h ░░</span>  <span class="pending">T+48h ░░</span>
+      </div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Receipts</div>
+      <div class="info-value" id="info-receipts">0</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Stats</div>
+      <div class="info-value" id="info-stats">—</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// ENGINE
+// ════════════════════════════════════════════════════════════
+
+const terminalLines = document.getElementById('terminal-lines');
+const infoStage = document.getElementById('info-stage');
+const infoGates = document.getElementById('info-gates');
+const infoReceipts = document.getElementById('info-receipts');
+const infoStats = document.getElementById('info-stats');
+
+const MAX_VISIBLE_LINES = 30;
+const CHAR_DELAY = 40;       // ms per char for typed commands
+const LINE_DELAY = 200;      // ms between output lines
+const ACT_DIVIDER_PAUSE = 2000; // ms between acts
+
+let paused = false;
+let abortController = null;
+let currentActIndex = 0;
+let playing = false;
+
+// ── Sleep with pause support ──
+function sleep(ms) {
+  return new Promise(resolve => {
+    let elapsed = 0;
+    const tick = 50;
+    const id = setInterval(() => {
+      if (abortController && abortController.signal.aborted) {
+        clearInterval(id);
+        resolve('aborted');
+        return;
+      }
+      if (!paused) elapsed += tick;
+      if (elapsed >= ms) {
+        clearInterval(id);
+        resolve('done');
+      }
+    }, tick);
+  });
+}
+
+// ── Trim to max visible lines ──
+function trimLines() {
+  while (terminalLines.children.length > MAX_VISIBLE_LINES) {
+    terminalLines.removeChild(terminalLines.firstChild);
+  }
+}
+
+// ── Add a complete line instantly ──
+function addLine(html, className) {
+  const div = document.createElement('div');
+  div.className = 'line' + (className ? ' ' + className : '');
+  div.innerHTML = html;
+  terminalLines.appendChild(div);
+  trimLines();
+}
+
+// ── Type a command character by character ──
+async function typeCommand(text) {
+  const div = document.createElement('div');
+  div.className = 'line';
+  const promptSpan = document.createElement('span');
+  promptSpan.className = 'prompt';
+  promptSpan.textContent = '$ ';
+  const cmdSpan = document.createElement('span');
+  cmdSpan.className = 'cmd';
+  div.appendChild(promptSpan);
+  div.appendChild(cmdSpan);
+  terminalLines.appendChild(div);
+  trimLines();
+
+  for (let i = 0; i < text.length; i++) {
+    if (abortController && abortController.signal.aborted) return;
+    cmdSpan.textContent += text[i];
+    const r = await sleep(CHAR_DELAY);
+    if (r === 'aborted') return;
+  }
+}
+
+// ── Type a comment line ($ # ...) ──
+async function typeComment(text) {
+  await typeCommand('# ' + text);
+}
+
+// ── Output a line with delay ──
+async function outputLine(html, delay) {
+  if (abortController && abortController.signal.aborted) return;
+  addLine(html);
+  const r = await sleep(delay || LINE_DELAY);
+  if (r === 'aborted') return;
+}
+
+// ── Output multiple lines simultaneously ──
+function outputBatch(htmlArray) {
+  for (const html of htmlArray) {
+    addLine(html);
+  }
+}
+
+// ── Act divider ──
+async function actDivider() {
+  if (abortController && abortController.signal.aborted) return;
+  addLine('<span class="muted">───────────────────────────────</span>');
+  const r = await sleep(ACT_DIVIDER_PAUSE);
+  if (r === 'aborted') return;
+}
+
+// ── Info strip helpers ──
+function setStage(text) {
+  infoStage.textContent = text;
+}
+
+function setReceipts(n) {
+  infoReceipts.textContent = String(n);
+}
+
+function setGates(t2h, t24h, t48h) {
+  function gateSpan(label, state) {
+    if (state === 'pass') return '<span class="pass">' + label + ' ██ PASS</span>';
+    return '<span class="pending">' + label + ' ░░</span>';
+  }
+  infoGates.innerHTML = gateSpan('T+2h', t2h) + '  ' + gateSpan('T+24h', t24h) + '  ' + gateSpan('T+48h', t48h);
+}
+
+function setStats(text) {
+  infoStats.textContent = text;
+}
+
+// ── Clear terminal for restart ──
+function clearTerminal() {
+  terminalLines.innerHTML = '';
+  setStage('—');
+  setGates('pending', 'pending', 'pending');
+  setReceipts(0);
+  setStats('—');
+}
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    paused = !paused;
+  } else if (e.code === 'KeyR') {
+    restart();
+  } else if (e.code === 'KeyJ') {
+    jumpToAct(5);
+  } else if (e.code === 'KeyF') {
+    jumpToFinal();
+  }
+});
+
+// ── Restart ──
+function restart() {
+  if (abortController) abortController.abort();
+  playing = false;
+  paused = false;
+  clearTerminal();
+  setTimeout(() => startPlayback(), 100);
+}
+
+// ── Jump to Act 5 (T+2h gate) ──
+function jumpToAct(actNum) {
+  if (abortController) abortController.abort();
+  playing = false;
+  paused = false;
+  clearTerminal();
+  setTimeout(() => startPlayback(actNum), 100);
+}
+
+// ── Jump to final state ──
+function jumpToFinal() {
+  if (abortController) abortController.abort();
+  playing = false;
+  paused = false;
+  clearTerminal();
+  setTimeout(() => renderFinalState(), 100);
+}
+
+// ════════════════════════════════════════════════════════════
+// ACTS
+// ════════════════════════════════════════════════════════════
+
+// ── ACT 1: THE IDEA (0-12s) ──
+async function act1_idea() {
+  setStage('1/7 — IDEA');
+  setGates('pending', 'pending', 'pending');
+  setReceipts(0);
+
+  await typeComment('═══════════════════════════════════════════════════════');
+  await sleep(500);
+  await typeComment('RECEIPTS-NATIVE BUILD SESSION');
+  await sleep(500);
+  await typeComment('Component: Monte Carlo FEEDBACK_LOOP Scenario (v2.0)');
+  await sleep(500);
+  await typeComment('Gate target: T+48h — 100% coverage, all 8 scenarios pass');
+  await sleep(500);
+  await typeComment('═══════════════════════════════════════════════════════');
+}
+
+// ── ACT 2: RESEARCHLOOP (12-30s) ──
+async function act2_researchloop() {
+  setStage('2/7 — RESEARCHLOOP');
+
+  await typeCommand('python -m researchloop --query "Monte Carlo FEEDBACK_LOOP scenario requirements" --models grok,claude,gemini');
+  await sleep(400);
+
+  await outputLine('<span class="output">[RESEARCHLOOP v3] Initiating multi-source validation...</span>', 300);
+
+  // Three "Querying" lines appear simultaneously
+  outputBatch([
+    '<span class="secondary">[09:00:14] Querying Grok    → physics constraint validation</span>',
+    '<span class="secondary">[09:00:14] Querying Claude   → architecture alignment check</span>',
+    '<span class="secondary">[09:00:14] Querying Gemini   → cross-reference verification</span>'
+  ]);
+
+  // 3-second pause simulating model response
+  await sleep(3000);
+
+  await outputLine('<span class="output">[09:00:18] Grok response    ✓ Entropy conservation |ΔS| &lt; 0.01 confirmed</span>', 500);
+  await outputLine('<span class="output">[09:00:19] Claude response  ✓ FEEDBACK_LOOP must produce ≥25 training examples</span>', 500);
+  await outputLine('<span class="output">[09:00:20] Gemini response  ✓ correction_rate_decrease ≥ 50% per Monte Carlo v2.0</span>', 500);
+
+  await outputLine('', 200); // blank line
+  await outputLine('<span class="output">[RESEARCHLOOP] Consensus reached: 3/3 models agree on pass criteria</span>', 300);
+  await outputLine('<span class="amber">[RESEARCHLOOP] receipt emitted: research_receipt sha256:7a8b9c4d...</span>', 300);
+
+  setReceipts(1);
+}
+
+// ── ACT 3: SPECIFICATION (30-45s) ──
+async function act3_specification() {
+  setStage('3/7 — SPECIFICATION');
+
+  await typeCommand('cat build_spec_feedback_loop.md | head -20');
+  await sleep(400);
+
+  await outputLine('<span class="white-bold"># FEEDBACK_LOOP Scenario — Build Specification</span>', LINE_DELAY);
+  await outputLine('<span class="secondary"># Generated: 2026-02-27T09:01:22Z</span>', LINE_DELAY);
+  await outputLine('<span class="secondary"># Source: RESEARCHLOOP v3 consensus (3/3 models)</span>', LINE_DELAY);
+  await outputLine('', 150);
+  await outputLine('<span class="output">## Pass Criteria</span>', LINE_DELAY);
+  await outputLine('<span class="output">  - correction_rate_decrease: ≥ 50%</span>', LINE_DELAY);
+  await outputLine('<span class="output">  - model_improvement_detected: true</span>', LINE_DELAY);
+  await outputLine('<span class="output">  - training_examples_produced: ≥ 25</span>', LINE_DELAY);
+  await outputLine('<span class="output">  - reason_codes_captured: true</span>', LINE_DELAY);
+  await outputLine('', 150);
+  await outputLine('<span class="output">## Cycle Count: 500</span>', LINE_DELAY);
+  await outputLine('<span class="output">## Constraint Validators: 5 (ConservationValidator active)</span>', LINE_DELAY);
+  await outputLine('<span class="output">## Gate Schedule:</span>', LINE_DELAY);
+  await outputLine('<span class="output">  - <span class="amber">T+2h</span>:  dual_hash() emits valid receipt, CLI produces JSON</span>', LINE_DELAY);
+  await outputLine('<span class="output">  - <span class="amber">T+24h</span>: 80% test coverage, BASELINE scenario passes</span>', LINE_DELAY);
+  await outputLine('<span class="output">  - <span class="amber">T+48h</span>: 100% coverage, all 8 scenarios pass</span>', LINE_DELAY);
+  await outputLine('', 150);
+  await outputLine('<span class="amber">receipt emitted: spec_receipt sha256:3e5f8a2b...</span>', 300);
+
+  setReceipts(2);
+}
+
+// ── ACT 4: CLAUDE CODE EXECUTION (45-65s) ──
+async function act4_claudecode() {
+  setStage('4/7 — CLAUDE CODE');
+
+  await typeCommand('claude-code build --spec build_spec_feedback_loop.md --standard CLAUDEME');
+  await sleep(400);
+
+  await outputLine('<span class="output">[CLAUDE CODE] Loading CLAUDEME.md standards...</span>', 300);
+  await outputLine('<span class="output">[CLAUDE CODE] Parsing specification: 6 requirements, 3 gates</span>', 300);
+
+  await sleep(800);
+  await outputLine('<span class="output">[CLAUDE CODE] Creating <span class="blue">src/scenarios/feedback_loop.py</span></span>', 300);
+  await outputLine('', 150);
+  await outputLine('<span class="secondary">  Writing FeedbackLoopScenario class...</span>', 300);
+  await outputLine('<span class="secondary">  Writing correction_handler()...</span>', 300);
+  await outputLine('<span class="secondary">  Writing training_data_factory()...</span>', 300);
+  await outputLine('<span class="secondary">  Writing improvement_detector()...</span>', 300);
+  await outputLine('<span class="secondary">  Injecting emit_receipt() at every operation boundary...</span>', 300);
+  await outputLine('', 150);
+
+  await sleep(800);
+  await outputLine('<span class="output">[CLAUDE CODE] Creating <span class="blue">tests/test_feedback_loop.py</span></span>', 300);
+  await outputLine('', 150);
+
+  await outputLine('<span class="output">  test_correction_rate_decreases............... <span class="amber">✓</span></span>', 400);
+  await outputLine('<span class="output">  test_training_examples_produced.............. <span class="amber">✓</span></span>', 400);
+  await outputLine('<span class="output">  test_model_improvement_detected.............. <span class="amber">✓</span></span>', 400);
+  await outputLine('<span class="output">  test_reason_codes_captured................... <span class="amber">✓</span></span>', 400);
+  await outputLine('<span class="output">  test_conservation_validator.................. <span class="amber">✓</span></span>', 400);
+  await outputLine('<span class="output">  test_receipt_emission_complete............... <span class="amber">✓</span></span>', 400);
+  await outputLine('', 150);
+  await outputLine('<span class="amber">  6 passed, 0 failed, 0 skipped</span>', 400);
+  await outputLine('', 200);
+
+  await outputLine('<span class="output">[CLAUDE CODE] Computing dual-hash...</span>', 300);
+  await outputLine('<span class="amber">  SHA256: a1b2c3d4e5f6...</span>', 250);
+  await outputLine('<span class="amber">  BLAKE3: 9f8e7d6c5b4a...</span>', 250);
+  await outputLine('<span class="amber">  Combined: a1b2c3d4e5f6:9f8e7d6c5b4a</span>', 300);
+  await outputLine('', 150);
+  await outputLine('<span class="amber">receipt emitted: build_receipt sha256:a1b2c3d4...</span>', 300);
+
+  setReceipts(3);
+}
+
+// ── ACT 5: T+2h GATE (65-80s) ──
+async function act5_gate_t2h() {
+  setStage('5/7 — GATE T+2h');
+
+  await typeCommand('python -m gate_check --gate t2h --spec build_spec_feedback_loop.md');
+  await sleep(400);
+
+  await outputLine('<span class="output">[GATE T+2h] Validating...</span>', 300);
+  await outputLine('<span class="output">  <span class="amber">✓</span> dual_hash() emits valid receipt</span>', 400);
+  await outputLine('<span class="output">  <span class="amber">✓</span> CLI produces JSON output</span>', 400);
+  await outputLine('<span class="output">  <span class="amber">✓</span> Receipt chain integrity: 3 receipts, 0 gaps</span>', 400);
+  await outputLine('<span class="output">  <span class="amber">✓</span> CLAUDEME compliance: all emit_receipt() calls present</span>', 400);
+
+  // Victory Breath: 2-second pause
+  await sleep(2000);
+
+  await outputLine('<span class="amber-bold">  ══════════════════════════════════════════════</span>', 200);
+  await outputLine('<span class="amber-bold">  GATE T+2h: PASS                    [3/3 criteria met]</span>', 200);
+  await outputLine('<span class="amber-bold">  ══════════════════════════════════════════════</span>', 200);
+
+  // 1.5-second hold after PASS
+  await sleep(1500);
+
+  await outputLine('<span class="amber">receipt emitted: gate_receipt sha256:5d6e7f8a...</span>', 300);
+
+  setGates('pass', 'pending', 'pending');
+  setReceipts(4);
+}
+
+// ── ACT 6: FULL VALIDATION (80-105s) ──
+async function act6_validation() {
+  setStage('6/7 — VALIDATION');
+
+  await typeCommand('python -m monte_carlo --all-scenarios --workers 7');
+  await sleep(400);
+
+  await outputLine('<span class="output">[MONTE CARLO v2.0] Running 8 mandatory scenarios (7 workers)...</span>', 400);
+  await outputLine('', 200);
+
+  await outputLine('<span class="output">  BASELINE        1000 cycles    <span class="amber">✓</span> 99.9% completion, 0 violations</span>', 800);
+  await outputLine('<span class="output">  STRESS           500 cycles    <span class="amber">✓</span> 97% accuracy at 5x, 4.2GB RAM</span>', 800);
+  await outputLine('<span class="output">  TOPOLOGY         100 cycles    <span class="amber">✓</span> 98.7% classification accuracy</span>', 800);
+  await outputLine('<span class="output">  CASCADE          100 cycles    <span class="amber">✓</span> Exact variant count, all backtests pass</span>', 800);
+  await outputLine('<span class="output">  COMPRESSION      200 cycles    <span class="amber">✓</span> +7.2% meta-pattern improvement</span>', 800);
+  await outputLine('<span class="output">  SINGULARITY     2000 cycles    <span class="amber">✓</span> Converged at cycle 847, entropy negative</span>', 800);
+  await outputLine('<span class="output">  THERMODYNAMIC   1000 cycles    <span class="amber">✓</span> |ΔS| &lt; 0.01 every cycle (max: 0.0089)</span>', 800);
+  await outputLine('<span class="output">  FEEDBACK_LOOP    500 cycles    <span class="amber">✓</span> Corrections ↓ 62%, model improved</span>', 800);
+
+  // 2-second pause after all 8
+  await sleep(2000);
+
+  await outputLine('<span class="amber-bold">  ══════════════════════════════════════════════</span>', 200);
+  await outputLine('<span class="amber-bold">  8/8 SCENARIOS PASSED              runtime: 34m 12s</span>', 200);
+  await outputLine('<span class="amber-bold">  ══════════════════════════════════════════════</span>', 300);
+  await outputLine('', 200);
+  await outputLine('<span class="output">  Conservation validated: |ΔS| &lt; 0.01 across 4400 total cycles</span>', 250);
+  await outputLine('<span class="output">  Training examples produced: 31 (≥25 required)</span>', 250);
+  await outputLine('<span class="output">  All 5 constraint validators: <span class="amber">PASS</span></span>', 400);
+
+  await sleep(800);
+
+  // T+48h gate check
+  await outputLine('', 200);
+  await outputLine('<span class="output">[GATE T+48h] Validating...</span>', 300);
+  await outputLine('<span class="output">  <span class="amber">✓</span> 100% test coverage</span>', 400);
+  await outputLine('<span class="output">  <span class="amber">✓</span> All 8 Monte Carlo scenarios pass</span>', 400);
+  await outputLine('<span class="output">  <span class="amber">✓</span> Receipt chain integrity: 12 receipts, 0 gaps</span>', 400);
+  await outputLine('<span class="output">  <span class="amber">✓</span> Entropy conservation: PROVEN</span>', 400);
+
+  // Victory Breath: 2-second pause
+  await sleep(2000);
+
+  await outputLine('<span class="amber-bold">  ══════════════════════════════════════════════</span>', 200);
+  await outputLine('<span class="amber-bold">  GATE T+48h: PASS                   [4/4 criteria met]</span>', 200);
+  await outputLine('<span class="amber-bold">  ══════════════════════════════════════════════</span>', 300);
+
+  // 1.5-second hold after PASS
+  await sleep(1500);
+
+  await outputLine('<span class="amber">receipt emitted: gate_receipt sha256:b2c3d4e5...</span>', 250);
+  await outputLine('<span class="amber">receipt emitted: monte_carlo_receipt sha256:e8f9a0b1...</span>', 250);
+
+  setGates('pass', 'pass', 'pass');
+  setReceipts(12);
+}
+
+// ── ACT 7: SHIP (105-120s) ──
+async function act7_ship() {
+  setStage('7/7 — SHIP');
+
+  await typeCommand('git add -A && git commit -m "feat(monte-carlo): FEEDBACK_LOOP scenario v2.0');
+  await sleep(200);
+
+  // Multi-line commit message continuation (typed)
+  addLine('<span class="cmd">Receipt: monte_carlo_receipt</span>');
+  await sleep(150);
+  addLine('<span class="cmd">SLO: all_scenarios_pass 100%, entropy_conservation 100%</span>');
+  await sleep(150);
+  addLine('<span class="cmd">Gate: t48h PASS</span>');
+  await sleep(150);
+  addLine('<span class="cmd">Chain: 14 receipts, 0 gaps, genesis → HEAD verified"</span>');
+  await sleep(400);
+
+  await outputLine('', 200);
+  await outputLine('<span class="output">[main 8f9e2d1] feat(monte-carlo): FEEDBACK_LOOP scenario v2.0</span>', 250);
+  await outputLine('<span class="output"> 3 files changed, 847 insertions(+)</span>', 200);
+  await outputLine('<span class="output"> create mode 100644 <span class="blue">src/scenarios/feedback_loop.py</span></span>', 200);
+  await outputLine('<span class="output"> create mode 100644 <span class="blue">tests/test_feedback_loop.py</span></span>', 200);
+  await outputLine('<span class="output"> create mode 100644 <span class="blue">receipts/session_2026-02-27.jsonl</span></span>', 200);
+
+  await sleep(600);
+
+  await typeCommand('python -m manifest --anchor');
+  await sleep(400);
+
+  await outputLine('<span class="output">[MANIFEST] Generating deployment anchor...</span>', 400);
+  await outputLine('', 200);
+  await outputLine('<span class="output">  Session ID:     2026-02-27-feedback-loop</span>', 250);
+  await outputLine('<span class="output">  Total Receipts: <span class="amber">14</span></span>', 250);
+  await outputLine('<span class="output">  Chain Integrity: <span class="amber">VERIFIED</span> (genesis → HEAD)</span>', 250);
+  await outputLine('<span class="output">  Dual-Hash:      <span class="amber">a1b2c3d4:9f8e7d6c</span></span>', 250);
+  await outputLine('<span class="output">  Merkle Root:    <span class="amber">sha256:4e5f6a7b8c9d...</span></span>', 250);
+  await outputLine('<span class="output">  Gates Passed:   <span class="amber">T+2h ✓  T+24h ✓  T+48h ✓</span></span>', 250);
+
+  // 3-second Victory Breath
+  await sleep(3000);
+
+  await outputLine('<span class="amber-bold">  ══════════════════════════════════════════════</span>', 200);
+  await outputLine('<span class="amber-bold">  MANIFEST.anchor SEALED</span>', 200);
+  await outputLine('<span class="amber-bold">  ══════════════════════════════════════════════</span>', 300);
+
+  // Quote appears 1.5s after banner
+  await sleep(1500);
+  await outputLine('', 100);
+  await outputLine('<span class="italic-secondary">  "We built this accountably."</span>', 300);
+
+  await sleep(800);
+  await outputLine('', 150);
+  await outputLine('<span class="amber">receipt emitted: manifest_receipt sha256:c4d5e6f7...</span>', 300);
+
+  setStage('7/7 — SHIPPED ✓');
+  setReceipts(14);
+  setStats('14 receipts | 0 gaps | genesis → HEAD verified');
+}
+
+const acts = [act1_idea, act2_researchloop, act3_specification, act4_claudecode, act5_gate_t2h, act6_validation, act7_ship];
+
+// ── Main playback loop ──
+async function startPlayback(fromAct) {
+  if (playing) return;
+  playing = true;
+  abortController = new AbortController();
+  const startIdx = (fromAct || 1) - 1;
+
+  // If jumping ahead, render prior info-strip state
+  if (startIdx >= 5) {
+    setStage('5/7 — GATE T+2h');
+    setGates('pass', 'pending', 'pending');
+    setReceipts(4);
+  } else if (startIdx >= 4) {
+    setStage('4/7 — CLAUDE CODE');
+    setReceipts(3);
+  } else if (startIdx >= 3) {
+    setStage('3/7 — SPECIFICATION');
+    setReceipts(2);
+  }
+
+  for (let i = startIdx; i < acts.length; i++) {
+    if (abortController.signal.aborted) break;
+    currentActIndex = i;
+    await acts[i]();
+    if (abortController.signal.aborted) break;
+    if (i < acts.length - 1) await actDivider();
+  }
+  playing = false;
+}
+
+// ── Render final state instantly (for F key) ──
+function renderFinalState() {
+  playing = false;
+  clearTerminal();
+
+  setStage('7/7 — SHIPPED ✓');
+  setGates('pass', 'pass', 'pass');
+  setReceipts(14);
+  setStats('14 receipts | 0 gaps | genesis → HEAD verified');
+
+  const lines = [
+    '<span class="output">[MANIFEST] Generating deployment anchor...</span>',
+    '',
+    '<span class="output">  Session ID:     2026-02-27-feedback-loop</span>',
+    '<span class="output">  Total Receipts: <span class="amber">14</span></span>',
+    '<span class="output">  Chain Integrity: <span class="amber">VERIFIED</span> (genesis → HEAD)</span>',
+    '<span class="output">  Dual-Hash:      <span class="amber">a1b2c3d4:9f8e7d6c</span></span>',
+    '<span class="output">  Merkle Root:    <span class="amber">sha256:4e5f6a7b8c9d...</span></span>',
+    '<span class="output">  Gates Passed:   <span class="amber">T+2h ✓  T+24h ✓  T+48h ✓</span></span>',
+    '',
+    '<span class="amber-bold">  ══════════════════════════════════════════════</span>',
+    '<span class="amber-bold">  MANIFEST.anchor SEALED</span>',
+    '<span class="amber-bold">  ══════════════════════════════════════════════</span>',
+    '',
+    '<span class="italic-secondary">  "We built this accountably."</span>',
+    '',
+    '<span class="amber">receipt emitted: manifest_receipt sha256:c4d5e6f7...</span>'
+  ];
+
+  for (const html of lines) {
+    addLine(html);
+  }
+}
+
+// ── Auto-start ──
+window.addEventListener('load', () => {
+  startPlayback();
+});
+</script>
+</body>
+</html>
